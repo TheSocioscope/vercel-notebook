@@ -132,26 +132,41 @@ TeamCard = Card(
     cls=CardT.hover)
 
 
-project_list =(('bell','FR-003',""), 
-                ('user',"Available","Only mentions and comments"),
-                ('ban', "Ignoring","Turn of all notifications"))
-
+project_list =(('bell','FR-004',"Bande de cheffes"), 
+                ('user',"DK-021","Nordic Harvest"),
+                ('ban', "CO-006","Urban farmers"))
 
 def ProjectRow(icon, name, desc):
     return Li(cls='-mx-1')(A(DivLAligned(UkIcon(icon),Div(P(name),P(desc, cls=TextPresets.muted_sm)))))
 
 ProjectsCard = Card(
     NavContainer(
-        *[ProjectRow(*row) for row in section_content],
+        *[ProjectRow(*row) for row in project_list],
         cls=NavT.secondary),
     header = (H3('Projects'),Subtitle('List of available projects')),
+    body_cls='pt-0'
+)
+
+def RecordsRow(name):
+    return Li(cls='-mx-1')(A(DivLAligned(UkIcon(icon='check') ,Div(P(name)))))
+
+records_list = (("FR-004_debrief_audio.m4a"),
+                ("FR-004_interview_audio_1.m4a"),
+                ("FR-004_interview_audio_2.m4a"),
+                ("FR-004_interview_audio_3.m4a"))
+
+RecordsCard = Card(
+    NavContainer(
+        *[RecordsRow(row) for row in records_list],
+        cls=NavT.secondary),
+    header = (H3('Records'),Subtitle('List of available records')),
     body_cls='pt-0'
 )
 
 def Cards():
     return Title("Cards Example"), Container(Grid(
             *map(Div,(
-                      Div(ProjectsCard, PaymentMethod,CreateAccount, TeamCard, cls='space-y-4'),
+                      Div(ProjectsCard, RecordsCard, CreateAccount, TeamCard, cls='space-y-4'),
                       Div(TeamMembers, ShareDocument,DateCard,Notifications, cls='space-y-4'),
                       Div(ReportIssue,MonsterUI,CookieSettings, cls='space-y-4'))),
          cols_md=1, cols_lg=2, cols_xl=3))

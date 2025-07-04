@@ -3,7 +3,7 @@ from fasthtml.svg import *
 from monsterui.all import *
 import calendar
 from datetime import datetime
-from lib import *
+from helpers import *
 
 # Choose a theme color (blue, green, red, etc)
 hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
@@ -14,20 +14,6 @@ app, rt = fast_app(hdrs=hdrs)
 
 # Load transcripts
 transcripts = load_transcripts('data/transcripts.json')
-
-transcript_nav = (
-    ('FR', (
-        ('FR-004', "Bande de cheffes", ("FR-004_debrief_audio.m4a", "FR-004_interview_audio_1.m4a", "FR-004_interview_audio_2.m4a", "FR-004_interview_audio_3.m4a")),
-        )),
-    ('DK', (
-        ('DK-021', "Nordic Harvest", ("DK_021_audio.mp3", "DK_021_video.mp4")),
-        )),
-    ('CO', (
-        ('CO-006', "Urban farmers", ("CO_006_audio.mp3", "CO_006_video.mp4")),
-        ('CO-007', "New project", ("CO_007_audio.mp3", "CO_007_video.mp4"))
-        ))
-)
-
 transcript_nav = make_transcript_nav(transcripts)
 sources = []
 
@@ -39,45 +25,54 @@ def CheckTranscript(transcript:str):
     else:
         sources.append(transcript)
     print(f"Sources: {sources}")
-    result = *[Li(source) for source in sorted(sources)],
-    return result
-
+    return Card(
+        Div(*[Li(source) for source in sorted(sources)]),
+        header=(H3('Sources'), Subtitle(f'Selected transcripts ({len(sources)})')),
+        #body_cls='pt-0',
+        #id='sources'
+    )
+    
 def TranscriptRow(transcript):
-    return DivLAligned(LabelCheckboxX(transcript, id=transcript, cls='space-x-1 space-y-3', hx_target='#sources', hx_post=CheckTranscript.to(transcript=transcript)))
-    #return DivLAligned(CheckboxX(FormLabel(record), cls='space-x-2 space-y-3'))
+    return DivLAligned(LabelCheckboxX(transcript, id=transcript, cls='space-x-1 space-y-3', 
+                                      hx_target='#sources', 
+                                      hx_post=CheckTranscript.to(transcript=transcript),
+                                      hx_swap='innerHTML'))
 
 def ProjectRow(project, records):
     return AccordionItem(
         P(f'{project} ({len(records)})'),
         *[TranscriptRow(record) for record in records],
+        title_cls='pt-2 pb-2'
     )
 
 def CountryRow(country, projects):
     return AccordionItem(
-        P(f'{country} ({len(projects)})'), 
+        P(f'{country.title()} ({len(projects)})'), 
         Accordion(
             *[ProjectRow(project, records) for project, records in projects.items()],
             multiple=True,
             animation=True,
             cls="pl-4",
             id=country
-        )
+        ),
+        title_cls='pt-2 pb-2'
     )
 
 TranscriptsCard = Card(
     Accordion(
         *[CountryRow(country, projects) for country, projects in transcript_nav.items()],
         multiple=True,
-        animation=True
+        animation=True,
     ),
     header = (H3('Transcripts'), Subtitle(f'Available transcripts ({len(transcripts)})')),
     body_cls='pt-0'
 )
 
 SourcesCard = Card(
-    Div(id="sources"),
-    header = (H3('Sources'), Subtitle(f'Selected transcripts')),
+    Div(),
+    header=(H3('Sources'), Subtitle(f'Selected transcripts ({len(sources)})')),
     body_cls='pt-0',
+    id='sources'
 )
 
 PromptCard = Card(

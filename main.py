@@ -1,5 +1,4 @@
 from fasthtml.common import *
-from fasthtml.components import Uk_input_tag
 from fasthtml.svg import *
 from monsterui.all import *
 import calendar
@@ -11,7 +10,7 @@ hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
 # Create your app with the theme
 app, rt = fast_app(hdrs=hdrs)
 
-records_list = (
+transcripts_list = (
     ('FR', (
         ('FR-004', "Bande de cheffes", ("FR-004_debrief_audio.m4a", "FR-004_interview_audio_1.m4a", "FR-004_interview_audio_2.m4a", "FR-004_interview_audio_3.m4a")),
         )),
@@ -24,27 +23,29 @@ records_list = (
         ))
 )
 
-records = []
+transcripts = []
+projects = []
 
 @rt
-def CheckRecord(record:str):
-    global records
-    if record in records:
-        records.remove(record)
+def CheckTranscript(transcript:str):
+    global transcripts
+    if transcript in transcripts:
+        transcripts.remove(transcript)
     else:
-        records.append(record)
-    print(f"Records: {records}")
-    result = *[Li(record) for record in sorted(records)],
+        transcripts.append(transcript)
+    print(f"Transcripts: {transcripts}")
+    result = *[Li(transcript) for transcript in sorted(transcripts)],
     return result
 
-def RecordRow(record):
-    return DivLAligned(LabelCheckboxX(record, id=record, cls='space-x-1 space-y-3', hx_target='#records', hx_post=CheckRecord.to(record=record)))
+def TranscriptRow(transcript):
+    return DivLAligned(LabelCheckboxX(transcript, id=transcript, cls='space-x-1 space-y-3', hx_target='#transcripts', hx_post=CheckTranscript.to(transcript=transcript)))
     #return DivLAligned(CheckboxX(FormLabel(record), cls='space-x-2 space-y-3'))
 
 def ProjectRow(project):
+    project_name = project[0] + ' - ' + project[1]
     return AccordionItem(
-        P(project[0] + ' - ' + project[1]),
-        *[RecordRow(record) for record in project[2]],
+        project_name,
+        *[TranscriptRow(record) for record in project[2]],
     )
 
 def CountryRow(country, projects):
@@ -59,24 +60,24 @@ def CountryRow(country, projects):
         )
     )
 
-RecordsCard = Card(
+TranscriptsCard = Card(
     Accordion(
-        *[CountryRow(*row) for row in records_list],
+        *[CountryRow(*row) for row in transcripts_list],
         multiple=True,
         animation=True
     ),
-    header = (H3('Records'),Subtitle('List of available records')),
+    header = (H3('Transcripts'),Subtitle('Available transcripts')),
     body_cls='pt-0'
 )
 
 SourcesCard = Card(
-    Div(id="records"),
-    header = (H3('Sources'), Subtitle('Selected records')),
+    Div(id="transcripts"),
+    header = (H3('Sources'), Subtitle('Selected transcripts')),
     body_cls='pt-0',
 )
 
 PromptCard = Card(
-    header = (H3('Prompt'), Subtitle('Chat with selected records')),
+    header = (H3('Prompt'), Subtitle('Chat with selected transcripts')),
     body_cls='pt-0'
 )
 
@@ -89,23 +90,23 @@ ParamsCard = Card(
             searchable=True),
         LabelRange(label='Temperature', value='12'),
         LabelRange(label='Maximum Length', value='80'),
-        LabelRange(label='Top P', value='40'),
+        # LabelRange(label='Top P', value='40'),
         cls='space-y-4'
     ),
     header = (H3('Parameters'), Subtitle('Models parameters')),
     body_cls='pt-0',
 )
 
-def Cards():
+def Main():
     return Title("NotebookLM"), Container(Grid(
             *map(Div,(
-                      Div(RecordsCard, cls='space-y-4'),
+                      Div(TranscriptsCard, cls='space-y-4'),
                       Div(SourcesCard, PromptCard, cls='space-y-4'),
                       Div(ParamsCard, cls='space-y-4'))),
          cols_md=1, cols_lg=3, cols_xl=3))
 
 @rt
 def index():
-    return Cards()
+    return Main()
 
 serve()

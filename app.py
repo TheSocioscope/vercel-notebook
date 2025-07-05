@@ -1,22 +1,20 @@
 from fasthtml.common import *
 from fasthtml.svg import *
 from monsterui.all import *
-import calendar
-from datetime import datetime
 from helpers import *
-from auth import *
 
 # Choose a theme color (blue, green, red, etc)
 hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
 
 # Create your app with the theme
 app, rt = fast_app(hdrs=hdrs)
-oauth = Auth(app, client)
 
 # Load transcripts
 transcripts = load_transcripts('data/transcripts.json')
 transcript_nav = make_transcript_nav(transcripts)
 sources = []
+global login
+login = ()
 
 @rt
 def CheckTranscript(transcript:str):
@@ -97,8 +95,8 @@ ParamsCard = Card(
     body_cls='pt-0',
 )
 
-def Main():
-    return Title("SocioscopeLM"), Container(Grid(
+def App():
+    return Title("SocioscopeSpace"), Container(Grid(
             *map(Div,(
                       Div(TranscriptsCard, cls='space-y-4'),
                       Div(SourcesCard, PromptCard, cls='space-y-4'),
@@ -106,11 +104,12 @@ def Main():
          cols_md=1, cols_lg=3, cols_xl=3))
 
 @rt
-def index(auth):
-    return Main()
-
+def index():
+    return App() if authentication(login) else RedirectResponse('/login', status_code=303)
+    
 @rt
-def login(req):
-    return Card(P("Not logged in"), A('Log in', href=oauth.login_link(req)))
+def login():
+    login = ('installation', 'theory')
+    return Card(P("Not logged in"), A('Log in', href='/'))
 
 serve()

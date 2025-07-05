@@ -1,4 +1,5 @@
 import json
+import os
 
 def load_transcripts(data_path):
     with open(data_path, 'r') as f:
@@ -22,3 +23,7 @@ def make_transcript_nav(transcripts):
     transcript_nav = {k: transcript_nav[k] for k in sorted(transcript_nav)}
 
     return transcript_nav
+
+def authentication(login):
+    return ((login[0] == os.getenv("AUTH_ID")) 
+            and (login[1] == os.getenv("AUTH_SECRET"))) 

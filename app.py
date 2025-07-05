@@ -2,19 +2,26 @@ from fasthtml.common import *
 from fasthtml.svg import *
 from monsterui.all import *
 from helpers import *
+from dataclasses import dataclass
+
+DB_NAME = "socioscope_db"
+COLLECTION_NAME = "socioscope_documents"
 
 # Choose a theme color (blue, green, red, etc)
 hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
 
 # Create your app with the theme
 app, rt = fast_app(hdrs=hdrs)
+auth = Auth()
 
-# Load transcripts
-transcripts = load_transcripts('data/transcripts.json')
-transcript_nav = make_transcript_nav(transcripts)
+# Load transcripts documents
+transcripts = load_transcripts(DB_NAME, COLLECTION_NAME)
+print(f'Loaded {len(transcripts)} transcripts.')
+
+# Build transcripts navigation
+transcript_nav = build_navigation(transcripts)
+
 sources = []
-global login
-login = ()
 
 @rt
 def CheckTranscript(transcript:str):
@@ -75,7 +82,7 @@ SourcesCard = Card(
 )
 
 PromptCard = Card(
-    header = (H3('Prompt'), Subtitle('Chat with selected transcripts')),
+    header = (H3('Discussion'), Subtitle('Research discussion with selected transcripts')),
     body_cls='pt-0'
 )
 
@@ -95,21 +102,55 @@ ParamsCard = Card(
     body_cls='pt-0',
 )
 
-def App():
-    return Title("SocioscopeSpace"), Container(Grid(
+LoginPage = Container(
+    DivRAligned(cls=(TextT.bold))("SOCIOSCOPE"),
+    DivCentered(cls='flex-1 p-16')(
+        DivVStacked(
+            H3("Authentication"),
+            Form(method="post", action="/authenticate")(
+                Fieldset(
+                    LabelInput(label='User', id='id'),
+                    LabelInput(label='Password', type="password", id='secret')
+                ),
+                Button("Login", type="submit", cls=(ButtonT.primary, "w-full")),
+                cls='space-y-6')
+        )
+    )
+)
+
+AppPage =  Container(
+        DivRAligned(
+            Button(A("Logout", href='/logout'), cls=ButtonT.ghost), 
+            P(cls=(TextT.bold))("SOCIOSCOPE"),
+        ),
+        Grid(
             *map(Div,(
                       Div(TranscriptsCard, cls='space-y-4'),
                       Div(SourcesCard, PromptCard, cls='space-y-4'),
                       Div(ParamsCard, cls='space-y-4'))),
-         cols_md=1, cols_lg=3, cols_xl=3))
+            cols_md=1, cols_lg=3, cols_xl=3))
 
 @rt
 def index():
-    return App() if authentication(login) else RedirectResponse('/login', status_code=303)
+    return (Title("Socioscope"), AppPage()) if auth.authenticate() else RedirectResponse(url='/login')
     
 @rt
 def login():
-    login = ('installation', 'theory')
-    return Card(P("Not logged in"), A('Log in', href='/'))
+    return index() if auth.authenticate() else (Title("Socioscope"), LoginPage())
+
+@rt
+def logout():
+    auth.logout()
+    return login()
+
+@dataclass
+class Login: id:str; secret:str
+
+@rt
+def authenticate(login: Login):
+    print(f"Authenticate with id={login.id}")
+    auth.login(login.id, login.secret)
+    return RedirectResponse(url='/')
+
 
 serve()

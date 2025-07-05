@@ -4,13 +4,14 @@ from monsterui.all import *
 import calendar
 from datetime import datetime
 from helpers import *
+from auth import *
 
 # Choose a theme color (blue, green, red, etc)
 hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
 
 # Create your app with the theme
 app, rt = fast_app(hdrs=hdrs)
-
+oauth = Auth(app, client)
 
 # Load transcripts
 transcripts = load_transcripts('data/transcripts.json')
@@ -105,7 +106,11 @@ def Main():
          cols_md=1, cols_lg=3, cols_xl=3))
 
 @rt
-def index():
+def index(auth):
     return Main()
+
+@rt
+def login(req):
+    return Card(P("Not logged in"), A('Log in', href=oauth.login_link(req)))
 
 serve()

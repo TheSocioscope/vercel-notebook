@@ -1,7 +1,11 @@
 # notebooklm-fasthtml
 
 ## Install
-> pip install -r requirements.txt
+```shell
+pip install -r requirements.txt
+```
 
 ## Run
-> python app.py
+```shell
+python app.py
+```

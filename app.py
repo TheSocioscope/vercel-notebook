@@ -13,6 +13,7 @@ hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
 # Create your app with the theme
 app, rt = fast_app(hdrs=hdrs)
 auth = Auth()
+sources = Sources()
 
 # Load transcripts documents
 transcripts = load_transcripts(DB_NAME, COLLECTION_NAME)
@@ -21,11 +22,8 @@ print(f'Loaded {len(transcripts)} transcripts.')
 # Build transcripts navigation
 transcript_nav = build_navigation(transcripts)
 
-sources = []
-
 @rt
-def CheckTranscript(transcript:str):
-    global sources
+def select(transcript:str):
     if transcript in sources:
         sources.remove(transcript)
     else:
@@ -37,11 +35,20 @@ def CheckTranscript(transcript:str):
         #body_cls='pt-0',
         #id='sources'
     )
-    
+
+@rt
+def send(prompt:str):
+    print(f"Receive prompt={prompt} on sources={sources}")
+    if len(prompt) > 0:
+        response = f"Response to prompt={prompt} on sources={sources}"
+        return response
+    else:
+        return ''  
+
 def TranscriptRow(transcript):
     return DivLAligned(LabelCheckboxX(transcript, id=transcript, cls='space-x-1 space-y-3', 
                                       hx_target='#sources', 
-                                      hx_post=CheckTranscript.to(transcript=transcript),
+                                      hx_post=select.to(transcript=transcript),
                                       hx_swap='innerHTML'))
 
 def ProjectRow(project, records):
@@ -64,6 +71,18 @@ def CountryRow(country, projects):
         title_cls='pt-2 pb-2'
     )
 
+def promptChat():
+    return Div(cls="flex-1 space-y-4")(
+        Form(
+            Textarea(rows=5, name="prompt", cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
+            DivRAligned(
+                Button("Send", cls=(ButtonT.primary), hx_post="/send", hx_target="#response", hx_swap="innerHTML"),
+                #Button("History", cls=ButtonT.secondary),
+            cls="flex gap-x-4 mt-4")              
+        ),
+        DivLAligned(id="#response")
+    ),
+
 TranscriptsCard = Card(
     Accordion(
         *[CountryRow(country, projects) for country, projects in transcript_nav.items()],
@@ -81,10 +100,11 @@ SourcesCard = Card(
     id='sources'
 )
 
-PromptCard = Card(
+PromptCard = Card( 
+    promptChat(),
     header = (H3('Discussion'), Subtitle('Research discussion with selected transcripts')),
     body_cls='pt-0'
-)
+)    
 
 ParamsCard = Card(
     NavContainer(
@@ -158,6 +178,5 @@ def authenticate(login: Login):
     print(f"Authenticate with id={login.id}")
     auth.login(login.id, login.secret)
     return RedirectResponse(url='/')
-
 
 serve()

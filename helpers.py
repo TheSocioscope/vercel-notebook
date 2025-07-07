@@ -61,3 +61,25 @@ class Auth:
     def authenticate(self):
         return (( self.id == os.getenv("AUTH_ID")) 
                 and (self.secret == os.getenv("AUTH_SECRET"))) 
+
+class Sources:
+    def __init__(self):
+        self.sources = []
+
+    def append(self, source):
+        self.sources.append(source)
+
+    def remove(self, source):
+        self.sources.remove(source)
+    
+    def __len__(self):
+        return len(self.sources)
+
+    def __iter__(self):
+        return iter(self.sources)
+
+    def __str__(self):
+        return str(self.sources)
+    
+    def __repr__(self):
+        return str(self.sources)

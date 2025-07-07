@@ -2,6 +2,7 @@ import json
 import os
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
+from dataclasses import dataclass
 
 def load_transcripts(database, collection):
     # Connect to database
@@ -83,3 +84,6 @@ class Sources:
     
     def __repr__(self):
         return str(self.sources)
+
+@dataclass
+class Login: id:str; secret:str

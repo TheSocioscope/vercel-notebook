@@ -2,7 +2,6 @@ from fasthtml.common import *
 from fasthtml.svg import *
 from monsterui.all import *
 from helpers import *
-from dataclasses import dataclass
 
 DB_NAME = "socioscope_db"
 COLLECTION_NAME = "socioscope_documents"
@@ -11,7 +10,7 @@ COLLECTION_NAME = "socioscope_documents"
 hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
 
 # Create your app with the theme
-app, rt = fast_app(hdrs=hdrs)
+app, rt = fast_app(hdrs=hdrs, live=True)
 auth = Auth()
 sources = Sources()
 
@@ -37,13 +36,10 @@ def select(transcript:str):
     )
 
 @rt
-def send(prompt:str):
-    print(f"Receive prompt={prompt} on sources={sources}")
-    if len(prompt) > 0:
-        response = f"Response to prompt={prompt} on sources={sources}"
-        return response
-    else:
-        return ''  
+def ask(prompt:str):
+    print(f"Incoming message={prompt} from sources={sources}")
+    response = f"Response to message={prompt} on sources={sources}" if len(prompt) > 0 else ''
+    return P(cls="uk-card-secondary p-4", header=None)(response)
 
 def TranscriptRow(transcript):
     return DivLAligned(LabelCheckboxX(transcript, id=transcript, cls='space-x-1 space-y-3', 
@@ -71,18 +67,6 @@ def CountryRow(country, projects):
         title_cls='pt-2 pb-2'
     )
 
-def promptChat():
-    return Div(cls="flex-1 space-y-4")(
-        Form(
-            Textarea(rows=5, name="prompt", cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
-            DivRAligned(
-                Button("Send", cls=(ButtonT.primary), hx_post="/send", hx_target="#response", hx_swap="innerHTML"),
-                #Button("History", cls=ButtonT.secondary),
-            cls="flex gap-x-4 mt-4")              
-        ),
-        DivLAligned(id="#response")
-    ),
-
 TranscriptsCard = Card(
     Accordion(
         *[CountryRow(country, projects) for country, projects in transcript_nav.items()],
@@ -100,8 +84,19 @@ SourcesCard = Card(
     id='sources'
 )
 
-PromptCard = Card( 
-    promptChat(),
+DiscussionCard = Card( 
+    Div(cls="flex-1 space-y-4")(
+        Form(hx_target='#response', 
+             hx_post=ask,
+             hx_swap='innerHTML')(
+            Textarea(rows=5, id="prompt", cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
+            DivRAligned(
+                Button("Ask", type="submit", cls=(ButtonT.primary)),
+                #Button("History", cls=ButtonT.secondary),
+            cls="flex gap-x-4 mt-4")              
+        ),
+        Div(id="response")
+    ),
     header = (H3('Discussion'), Subtitle('Research discussion with selected transcripts')),
     body_cls='pt-0'
 )    
@@ -149,7 +144,7 @@ LeftPanel = NavContainer(
     cls=(NavT.primary,"space-y-4 mt-4 w-1/5"))
 CenterPanel = Ul(id="component-nav", cls="uk-switcher mt-4 w-2/3")(
             Li(cls="uk-active") (TranscriptsCard(),
-            *map(Li, [PromptCard(), ParamsCard()])))
+            *map(Li, [DiscussionCard(), ParamsCard()])))
 RightPanel = Div(SourcesCard(), cls="mt-4 w-1/3")
 
 AppPage =  Container(
@@ -169,9 +164,6 @@ def login():
 def logout():
     auth.logout()
     return login()
-
-@dataclass
-class Login: id:str; secret:str
 
 @rt
 def authenticate(login: Login):

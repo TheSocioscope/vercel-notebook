@@ -118,17 +118,24 @@ LoginPage = Container(
     )
 )
 
-AppPage =  Container(
-        DivRAligned(
+Header = DivRAligned(
             Button(A("Logout", href='/logout'), cls=ButtonT.ghost), 
             P(cls=(TextT.bold))("SOCIOSCOPE"),
         ),
-        Grid(
-            *map(Div,(
-                      Div(TranscriptsCard, cls='space-y-4'),
-                      Div(SourcesCard, PromptCard, cls='space-y-4'),
-                      Div(ParamsCard, cls='space-y-4'))),
-            cols_md=1, cols_lg=3, cols_xl=3))
+
+LeftPanel = NavContainer(
+    *map(lambda x: Li(A(x)), ("Sources", "Discussion", "Parameters")),
+    uk_switcher="connect: #component-nav; animation: uk-animation-fade",
+    cls=(NavT.primary,"space-y-4 mt-4 w-1/5"))
+CenterPanel = Ul(id="component-nav", cls="uk-switcher mt-4 w-2/3")(
+            Li(cls="uk-active") (TranscriptsCard(),
+            *map(Li, [PromptCard(), ParamsCard()])))
+RightPanel = Div(SourcesCard(), cls="mt-4 w-1/3")
+
+AppPage =  Container(
+    Header,
+    Div(cls="flex gap-x-12")(LeftPanel, CenterPanel, RightPanel)
+)
 
 @rt
 def index():

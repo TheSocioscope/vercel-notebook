@@ -101,7 +101,7 @@ DiscussionCard = Card(
     body_cls='pt-0'
 )    
 
-ParamsCard = Card(
+ModelCard = Card(
     NavContainer(
         Select(
             Optgroup(map(Option,("text-davinci-003", "text-curie-001", "text-babbage-001", "text-ada-001")), label='GPT-3'),
@@ -113,7 +113,7 @@ ParamsCard = Card(
         # LabelRange(label='Top P', value='40'),
         cls='space-y-4'
     ),
-    header = (H3('Parameters'), Subtitle('Models parameters')),
+    header = (H3('Model'), Subtitle('Models parameters')),
     body_cls='pt-0',
 )
 
@@ -138,6 +138,7 @@ Header = DivRAligned(
             P(cls=(TextT.bold))("SOCIOSCOPE"),
         ),
 
+"""
 LeftPanel = NavContainer(
     *map(lambda x: Li(A(x)), ("Sources", "Discussion", "Parameters")),
     uk_switcher="connect: #component-nav; animation: uk-animation-fade",
@@ -145,11 +146,15 @@ LeftPanel = NavContainer(
 CenterPanel = Ul(id="component-nav", cls="uk-switcher mt-4 w-2/3")(
             Li(cls="uk-active") (TranscriptsCard(),
             *map(Li, [DiscussionCard(), ParamsCard()])))
-RightPanel = Div(SourcesCard(), cls="mt-4 w-1/3")
+"""
+LeftPanel = Div(cls="w-1/4")(TranscriptsCard)
+CenterPanel = Div(cls="w-1/2")(DiscussionCard)            
+RightPanel = Div(cls="space-y-4 w-1/4")(SourcesCard, ModelCard)
 
 AppPage =  Container(
     Header,
-    Div(cls="flex gap-x-12")(LeftPanel, CenterPanel, RightPanel)
+    Div(cls="flex gap-x-8 m-0")(LeftPanel, CenterPanel, RightPanel),
+    cls="uk-container-expand m-0 p-4"
 )
 
 @rt

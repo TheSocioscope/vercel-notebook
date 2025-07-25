@@ -62,32 +62,33 @@ class Rag:
 
         provider, model = model.split(":")
         if provider == "openai":
-            api_key = os.getenv["OPENAI_API_KEY"]
+            api_key = os.getenv("OPENAI_API_KEY")
             self.llm = init_chat_model(model=model, model_provider=provider, api_key=api_key)
         elif provider == "mistralai":
-            api_key = os.getenv["MISTRAL_API_KEY"]
+            api_key = os.getenv("MISTRAL_API_KEY")
             self.llm = init_chat_model(model=model, model_provider=provider, api_key=api_key)
         elif provider == "vllm":
             self.llm = VLLMOpenAI(
-                openai_api_key=os.getenv['HF_TOKEN'],
+                openai_api_key=os.getenv('HF_TOKEN'),
                 openai_api_base="https://socioscope2--vllm-serve.modal.run/v1",
                 model_name="neuralmagic/Meta-Llama-3.1-8B-Instruct-quantized.w4a16",
                 #model_kwargs={"stop": ["."]},
             )
         elif provider == "groq":
-            api_key = os.getenv["GROQ_API_KEY"]
+            api_key = os.getenv("GROQ_API_KEY")
             self.llm = init_chat_model(model=model, model_provider=provider, api_key=api_key)
         else:
             self.llm = None
 
         print(f"Loaded LLM model {provider}:{model}")
-        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large", api_key=os.getenv["OPENAI_API_KEY"])
+        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-large", api_key=os.getenv("OPENAI_API_KEY"))
         self.vector_store = InMemoryVectorStore(embedding=self.embeddings)
         self.retriever = None
+        self.graph = None
     
     def load_documents(self, docs):
         # Build vector store
-        documents = [Document(page_content=source['page_content'], metadata=source['metadata']) for source in sources]
+        documents = [Document(page_content=doc['page_content'], metadata=doc['metadata']) for doc in docs]
         self.vector_store.add_documents(documents=documents)
         self.retriever = self.vector_store.as_retriever(search_kwargs={"k": len(documents)})
         
@@ -109,7 +110,7 @@ class Rag:
         self.graph = graph_builder.compile()
         print(f"Vector database ready: {len(self.vector_store.store)} documents.")
 
-def prompt(docs, question, model="openai:gpt-4o-mini"):
+def query(docs, message, model="openai:gpt-4o-mini"):
     # Load model
     rag = Rag(model=model)
 
@@ -117,5 +118,5 @@ def prompt(docs, question, model="openai:gpt-4o-mini"):
     rag.load_documents(docs)
 
     # Ask question
-    rag.prompt.pretty_print()
-    return rag.graph.invoke({"question": question})
+    response = rag.graph.invoke({"question": message})
+    return response

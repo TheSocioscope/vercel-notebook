@@ -2,7 +2,28 @@ import json
 import os
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
-from dataclasses import dataclass
+
+class Sources:
+    def __init__(self):
+        self.sources = []
+
+    def append(self, source):
+        self.sources.append(source)
+
+    def remove(self, source):
+        self.sources.remove(source)
+    
+    def __len__(self):
+        return len(self.sources)
+
+    def __iter__(self):
+        return iter(self.sources)
+
+    def __str__(self):
+        return str(self.sources)
+    
+    def __repr__(self):
+        return str(self.sources)
 
 def load_transcripts(database, collection):
     # Connect to database
@@ -43,47 +64,13 @@ def build_navigation(transcripts):
     
     # Sort by country
     transcript_nav = {k: transcript_nav[k] for k in sorted(transcript_nav)}
-
     return transcript_nav
 
-class Auth:
-    def __init__(self):
-        self.id = ''
-        self.secret = ''
-    
-    def login(self, id, secret):
-        self.id = id
-        self.secret = secret
-
-    def logout(self):
-        self.id = ''
-        self.secret = ''
-
-    def authenticate(self):
-        return (( self.id == os.getenv("AUTH_ID")) 
-                and (self.secret == os.getenv("AUTH_SECRET"))) 
-
-class Sources:
-    def __init__(self):
-        self.sources = []
-
-    def append(self, source):
-        self.sources.append(source)
-
-    def remove(self, source):
-        self.sources.remove(source)
-    
-    def __len__(self):
-        return len(self.sources)
-
-    def __iter__(self):
-        return iter(self.sources)
-
-    def __str__(self):
-        return str(self.sources)
-    
-    def __repr__(self):
-        return str(self.sources)
-
-@dataclass
-class Login: id:str; secret:str
+def build_rag_docs(transcripts):
+    docs = {}
+    for transcript in transcripts:
+        key = transcript['FILE'][:-4]
+        page_content = transcript['TRANSCRIPT']
+        metadata = {k:v for k,v in transcript.items() if k not in ['TRANSCRIPT', '_id']}
+        docs[key] = {'page_content':page_content, 'metadata':metadata}
+    return docs

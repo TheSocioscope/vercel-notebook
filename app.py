@@ -1,8 +1,10 @@
 from fasthtml.common import *
 from fasthtml.svg import *
 from monsterui.all import *
-from helpers import *
-from rag import *
+
+from lib.auth import *
+from lib.sources import *
+from lib.rag import *
 
 DB_NAME = "socioscope_db"
 COLLECTION_NAME = "socioscope_documents"
@@ -22,6 +24,9 @@ print(f'Loaded {len(transcripts)} transcripts.')
 # Build transcripts navigation
 transcript_nav = build_navigation(transcripts)
 
+# Build docs for rag
+rag_docs = build_rag_docs(transcripts)
+
 @rt
 def select(transcript:str):
     if transcript in sources:
@@ -39,10 +44,14 @@ def select(transcript:str):
 @rt
 def ask(message:str):
     print(f'Incoming message="{message}" on sources={sources}')
-    docs = [{'page_content': "test1", 'metadata':{}}, {'page_content': "test2", 'metadata':{}}]
-    response = prompt(docs=docs, question=message)
+    docs = [rag_docs[source] for source in sources]
+    print(f'Waiting for response...')
+    response = query(docs=docs, message=message)
     # response = f"Response to message={message} on sources={sources}" if len(message) > 0 else ''
-    return P(cls="uk-card-secondary p-4", header=None)(response)
+    return Div(
+        P(cls="uk-card-secondary p-4", header=None)(response['answer'].answer),
+        P(cls="uk-card-secondary p-4", header=None)(response['answer'].citations)
+    )
 
 def TranscriptRow(transcript):
     return DivLAligned(LabelCheckboxX(transcript, id=transcript, cls='space-x-1 space-y-3', 

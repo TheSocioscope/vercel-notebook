@@ -2,6 +2,7 @@ from fasthtml.common import *
 from fasthtml.svg import *
 from monsterui.all import *
 from helpers import *
+from rag import *
 
 DB_NAME = "socioscope_db"
 COLLECTION_NAME = "socioscope_documents"
@@ -36,9 +37,11 @@ def select(transcript:str):
     )
 
 @rt
-def ask(prompt:str):
-    print(f"Incoming message={prompt} from sources={sources}")
-    response = f"Response to message={prompt} on sources={sources}" if len(prompt) > 0 else ''
+def ask(message:str):
+    print(f'Incoming message="{message}" on sources={sources}')
+    docs = [{'page_content': "test1", 'metadata':{}}, {'page_content': "test2", 'metadata':{}}]
+    response = prompt(docs=docs, question=message)
+    # response = f"Response to message={message} on sources={sources}" if len(message) > 0 else ''
     return P(cls="uk-card-secondary p-4", header=None)(response)
 
 def TranscriptRow(transcript):
@@ -89,7 +92,7 @@ DiscussionCard = Card(
         Form(hx_target='#response', 
              hx_post=ask,
              hx_swap='innerHTML')(
-            Textarea(rows=5, id="prompt", cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
+            Textarea(rows=5, id="message", cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
             DivRAligned(
                 Button("Ask", type="submit", cls=(ButtonT.primary)),
                 #Button("History", cls=ButtonT.secondary),

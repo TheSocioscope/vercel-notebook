@@ -6,6 +6,8 @@ from lib.auth import *
 from lib.sources import *
 from lib.rag import *
 
+from starlette.background import BackgroundTask
+
 DB_NAME = "socioscope_db"
 COLLECTION_NAME = "socioscope_documents"
 
@@ -16,6 +18,7 @@ hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
 app, rt = fast_app(hdrs=hdrs, live=True)
 auth = Auth()
 sources = Sources()
+messages = Messages()
 
 # Load transcripts documents
 transcripts = load_transcripts(DB_NAME, COLLECTION_NAME)
@@ -41,17 +44,21 @@ def select(transcript:str):
         #id='sources'
     )
 
+def rag_task(message:str):
+    print(f'Waiting for response...')
+    messages.append(message)
+    docs = [rag_docs[source] for source in sources]
+    response = rag(docs=docs, message=message)
+    messages.append(response)
+    print(messages)
+
 @rt
 def ask(message:str):
-    print(f'Incoming message="{message}" on sources={sources}')
-    docs = [rag_docs[source] for source in sources]
-    print(f'Waiting for response...')
-    response = query(docs=docs, message=message)
     # response = f"Response to message={message} on sources={sources}" if len(message) > 0 else ''
+    task = BackgroundTask(rag_task(message=message))
     return Div(
-        P(cls="uk-card-secondary p-4", header=None)(response['answer'].answer),
-        P(cls="uk-card-secondary p-4", header=None)(response['answer'].citations)
-    )
+        P(cls="uk-card-secondary p-4", header=None)(f"{len(messages)} messages")
+    ), task
 
 def TranscriptRow(transcript):
     return DivLAligned(LabelCheckboxX(transcript, id=transcript, cls='space-x-1 space-y-3', 

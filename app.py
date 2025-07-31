@@ -4,9 +4,10 @@ from monsterui.all import *
 
 from lib.auth import *
 from lib.sources import *
-from lib.rag import *
+from lib.discussion import *
 
 from starlette.background import BackgroundTask
+from fastlite import *
 
 DB_NAME = "socioscope_db"
 COLLECTION_NAME = "socioscope_documents"
@@ -17,47 +18,45 @@ hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
 # Create your app with the theme
 app, rt = fast_app(hdrs=hdrs, live=True)
 auth = Auth()
-sources = Sources()
-messages = Messages()
+# sources = Sources()
+db = database(':memory:')
+sources = db.create(Source, pk='filename')
+discussion = db.create(Message, pk='order')
 
 # Load transcripts documents
 transcripts = load_transcripts(DB_NAME, COLLECTION_NAME)
-print(f'Loaded {len(transcripts)} transcripts.')
+print(f'LOG:\tImport {len(transcripts)} transcripts.')
+
+# Build sources library
+for transcript in transcripts:
+    sources.insert(Source(filename=transcript['FILE'][:-4], 
+                          page_content=transcript['TRANSCRIPT'],
+                          metadata={k:str(v) for k,v in transcript.items() if k not in ['TRANSCRIPT', '_id']}))
+print(f'LOG:\tCreated {len(sources())} sources library.')
 
 # Build transcripts navigation
 transcript_nav = build_navigation(transcripts)
 
-# Build docs for rag
-rag_docs = build_rag_docs(transcripts)
-
 @rt
 def select(transcript:str):
-    if transcript in sources:
-        sources.remove(transcript)
-    else:
-        sources.append(transcript)
-    print(f"Sources: {sources}")
+    sources.update(filename=transcript, selected=not(sources[transcript].selected))
+    # print(f"Sources: {[source.filename for source in sources(where="selected=1")]}")
     return Card(
-        Div(*[Li(source) for source in sorted(sources)]),
-        header=(H3('Sources'), Subtitle(f'Selected transcripts ({len(sources)})')),
-        #body_cls='pt-0',
-        #id='sources'
+        Div(*[Li(source.filename) for source in sources(order_by='filename', where="selected=1")]),
+        header=(H3('Sources'), Subtitle(f'Selected transcripts ({len(sources(where="selected=1"))})')),
     )
 
-def rag_task(message:str):
-    print(f'Waiting for response...')
-    messages.append(message)
-    docs = [rag_docs[source] for source in sources]
-    response = rag(docs=docs, message=message)
-    messages.append(response)
-    print(messages)
+def rag_task(docs:list[dict], query:str):
+    print(f'LOG: Send "{query}" for RAG on {len(docs)} documents...')
+    response = send_rag(docs=docs, message=query)
+    discussion.insert(Message(order=len(discussion())+1, model='system', query=response['question'], context=response['question'], response=response['answer']['answer']))
 
 @rt
-def ask(message:str):
-    # response = f"Response to message={message} on sources={sources}" if len(message) > 0 else ''
-    task = BackgroundTask(rag_task(message=message))
+def ask(query:str):
+    docs = [dict(page_content=source.page_content, metadata=json.loads(source.metadata)) for source in sources(where="selected=1")]
+    task = BackgroundTask(rag_task(docs=docs, query=query))
     return Div(
-        P(cls="uk-card-secondary p-4", header=None)(f"{len(messages)} messages")
+        *[P(cls="uk-card-secondary p-4 mt-4", header=None)(f"{m.query}: {m.response}") for m in discussion()]
     ), task
 
 def TranscriptRow(transcript):
@@ -98,24 +97,23 @@ TranscriptsCard = Card(
 
 SourcesCard = Card(
     Div(),
-    header=(H3('Sources'), Subtitle(f'Selected transcripts ({len(sources)})')),
+    header=(H3('Sources'), Subtitle(f'Selected transcripts ({len(sources(where="selected=1"))})')),
     body_cls='pt-0',
     id='sources'
 )
 
 DiscussionCard = Card( 
     Div(cls="flex-1 space-y-4")(
-        Form(hx_target='#response', 
+        Div(id="discussion"),
+        Form(hx_target='#discussion', 
              hx_post=ask,
              hx_swap='innerHTML')(
-            Textarea(rows=5, id="message", cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
+            Textarea(rows=5, id="query", cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
             DivRAligned(
                 Button("Ask", type="submit", cls=(ButtonT.primary)),
                 #Button("History", cls=ButtonT.secondary),
             cls="flex gap-x-4 mt-4")              
-        ),
-        Div(id="response")
-    ),
+        )    ),
     header = (H3('Discussion'), Subtitle('Research discussion with selected transcripts')),
     body_cls='pt-0'
 )    
@@ -191,7 +189,7 @@ def logout():
 
 @rt
 def authenticate(login: Login):
-    print(f"Authenticate with id={login.id}")
+    print(f"LOG:\tAuthenticate with id={login.id}")
     auth.login(login.id, login.secret)
     return RedirectResponse(url='/')
 

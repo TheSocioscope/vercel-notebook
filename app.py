@@ -6,7 +6,6 @@ from lib.auth import *
 from lib.sources import *
 from lib.discussion import *
 
-from starlette.background import BackgroundTask
 from fastlite import *
 
 DB_NAME = "socioscope_db"
@@ -46,19 +45,36 @@ def select(transcript:str):
         header=(H3('Sources'), Subtitle(f'Selected transcripts ({len(sources(where="selected=1"))})')),
     )
 
+@threaded
 def rag_task(docs:list[dict], query:str):
     print(f'LOG: Send "{query}" for RAG on {len(docs)} documents...')
     response = send_rag(docs=docs, message=query)
     discussion.insert(Message(order=len(discussion())+1, model='system', query=response['question'], context=response['question'], response=response['answer']['answer']))
 
 @rt
+def rag_response(query:str):
+    if discussion():
+        return Div(*map(P(cls="uk-card-secondary ml-8 mt-4 p-4", header=None), [m.response for m in discussion()]))
+    else:
+        return Div("Waiting for response...", 
+                   id='wait', 
+                   hx_post=rag_response.to(query=query),
+                   hx_trigger='every 1s', hx_swap='outerHTML')
+
+@rt
 def ask(query:str):
     if sources(where="selected=1"):
         docs = [dict(page_content=source.page_content, metadata=json.loads(source.metadata)) for source in sources(where="selected=1")]
-        task = BackgroundTask(rag_task(docs=docs, query=query))
-        return Div(
-            *[P(cls="uk-card-secondary p-4 mt-4", header=None)(m.response) for m in discussion()]
-        ), task
+        
+        # Clear discussion
+        for message in discussion():
+            discussion.delete(message.order)
+        
+        # Run rag task
+        rag_task(docs, query)
+        
+        return rag_response(query)
+        # return Div(*map(P(cls="uk-card-secondary ml-8 mt-4 p-4", header=None), [m.response for m in discussion()])), task
     else:
         return Div(P("Please select a source.", cls="uk-card-secondary p-4 mt-4"))
 

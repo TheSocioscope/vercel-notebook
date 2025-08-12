@@ -7,5 +7,5 @@ pip install -r requirements.txt
 
 ## Run
 ```shell
-python app.py
+python main.py
 ```

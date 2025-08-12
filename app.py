@@ -54,15 +54,18 @@ def rag_task(docs:list[dict], query:str):
 @rt
 def rag_response(query:str):
     if discussion():
-        return Div(*map(P(cls="uk-card-secondary ml-8 mt-4 p-4", header=None), [m.response for m in discussion()]))
+        return (PromptForm(query), Div(*map(P(cls="uk-card-secondary mt-4 p-4", header=None), [m.response for m in discussion()])))
     else:
-        return Div("Waiting for response...", 
-                   id='wait', 
-                   hx_post=rag_response.to(query=query),
-                   hx_trigger='every 1s', hx_swap='outerHTML')
+        return (Textarea(rows=5, disabled=True, cls="uk-textarea p-4")(query),
+                Div(cls="uk-card-secondary mt-4 p-4",
+                    hx_target='#discussion',
+                    hx_post=rag_response.to(query=query),
+                    hx_trigger='every 1s', hx_swap='innerHTML')
+                    ("Please wait for the answer..."))
 
 @rt
 def ask(query:str):
+    print(f"LOG: Send query={query}")
     if sources(where="selected=1"):
         docs = [dict(page_content=source.page_content, metadata=json.loads(source.metadata)) for source in sources(where="selected=1")]
         
@@ -72,11 +75,15 @@ def ask(query:str):
         
         # Run rag task
         rag_task(docs, query)
-        
         return rag_response(query)
-        # return Div(*map(P(cls="uk-card-secondary ml-8 mt-4 p-4", header=None), [m.response for m in discussion()])), task
     else:
-        return Div(P("Please select a source.", cls="uk-card-secondary p-4 mt-4"))
+        return (PromptForm(query), Div(cls="uk-card-secondary p-4 mt-4")("Please select at least one source in the left panel."))
+
+def PromptForm(query:str=''): 
+    return Form(hx_target='#discussion', hx_post=ask, hx_swap='innerHTML')(
+                Textarea(rows=5, id="query", required=True, cls="uk-textarea p-4", placeholder="Write any question to LLM...")(query),
+                DivRAligned(Button("Ask", type="submit", cls=(ButtonT.primary)),
+                cls="mt-4")) 
 
 def TranscriptRow(transcript):
     return DivLAligned(LabelCheckboxX(transcript, 
@@ -122,12 +129,7 @@ SourcesCard = Card(
     id='sources'
 )
 
-PromptForm = Form(hx_target='#discussion', hx_post=ask, hx_swap='innerHTML')(
-                Textarea(rows=5, id="query", required=True, cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
-                DivRAligned(Button("Ask", id='ask', type="submit", cls=(ButtonT.primary)),
-                cls="mt-4")) 
-
-DiscussionCard = Card(PromptForm, Div(id="discussion"),  
+DiscussionCard = Card(Div(id='discussion')(PromptForm()),
     header = (H3('Discussion'), Subtitle('Research discussion with selected transcripts')),
     body_cls='pt-0 flex-1 space-y-4')    
 

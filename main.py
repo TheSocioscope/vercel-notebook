@@ -49,12 +49,16 @@ def select(transcript:str):
 def rag_task(docs:list[dict], query:str):
     print(f'LOG: Send "{query}" for RAG on {len(docs)} documents...')
     response = send_rag(docs=docs, message=query)
-    discussion.insert(Message(order=len(discussion())+1, model='system', query=response['question'], context=response['question'], response=response['answer']['answer']))
+    discussion.insert(Message(order=len(discussion())+1, model='openai:gpt-4o-mini', 
+                              question=response['question'], 
+                              contents=response['contents'], 
+                              responses=response['responses'], 
+                              final_response=response['final_response']))
 
 @rt
 def rag_response(query:str):
     if discussion():
-        return (PromptForm(query), Div(*map(P(cls="uk-card-secondary mt-4 p-4", header=None), [m.response for m in discussion()])))
+        return (PromptForm(query), Div(*map(P(cls="uk-card-secondary mt-4 p-4", header=None), [m.final_response for m in discussion()])))
     else:
         return (Textarea(rows=5, disabled=True, cls="uk-textarea p-4")(query),
                 Div(cls="uk-card-secondary mt-4 p-4",
@@ -65,7 +69,7 @@ def rag_response(query:str):
 
 @rt
 def ask(query:str):
-    print(f"LOG: Send query={query}")
+    #print(f"LOG: Send query={query}")
     if sources(where="selected=1"):
         docs = [dict(page_content=source.page_content, metadata=json.loads(source.metadata)) for source in sources(where="selected=1")]
         

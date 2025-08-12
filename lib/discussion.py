@@ -6,10 +6,11 @@ RAG_API_ENPOINT = os.getenv('RAG_API_ENDPOINT')
 
 class Message:
     order:int
-    query:str
-    context:list
-    model:str 
-    response:str
+    model:str
+    question:str
+    contents:list
+    responses:list
+    final_response:str
     
 def send_rag(docs, message, model="openai:gpt-4o-mini"):
     response = requests.post(

@@ -53,14 +53,18 @@ def rag_task(docs:list[dict], query:str):
 
 @rt
 def ask(query:str):
-    docs = [dict(page_content=source.page_content, metadata=json.loads(source.metadata)) for source in sources(where="selected=1")]
-    task = BackgroundTask(rag_task(docs=docs, query=query))
-    return Div(
-        *[P(cls="uk-card-secondary p-4 mt-4", header=None)(f"{m.query}: {m.response}") for m in discussion()]
-    ), task
+    if sources(where="selected=1"):
+        docs = [dict(page_content=source.page_content, metadata=json.loads(source.metadata)) for source in sources(where="selected=1")]
+        task = BackgroundTask(rag_task(docs=docs, query=query))
+        return Div(
+            *[P(cls="uk-card-secondary p-4 mt-4", header=None)(m.response) for m in discussion()]
+        ), task
+    else:
+        return Div(P("Please select a source.", cls="uk-card-secondary p-4 mt-4"))
 
 def TranscriptRow(transcript):
-    return DivLAligned(LabelCheckboxX(transcript, id=transcript, cls='space-x-1 space-y-3', 
+    return DivLAligned(LabelCheckboxX(transcript, 
+                                      id=transcript, cls='space-x-1 space-y-3', 
                                       hx_target='#sources', 
                                       hx_post=select.to(transcript=transcript),
                                       hx_swap='innerHTML'))
@@ -102,21 +106,14 @@ SourcesCard = Card(
     id='sources'
 )
 
-DiscussionCard = Card( 
-    Div(cls="flex-1 space-y-4")(
-        Div(id="discussion"),
-        Form(hx_target='#discussion', 
-             hx_post=ask,
-             hx_swap='innerHTML')(
-            Textarea(rows=5, id="query", cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
-            DivRAligned(
-                Button("Ask", type="submit", cls=(ButtonT.primary)),
-                #Button("History", cls=ButtonT.secondary),
-            cls="flex gap-x-4 mt-4")              
-        )    ),
+PromptForm = Form(hx_target='#discussion', hx_post=ask, hx_swap='innerHTML')(
+                Textarea(rows=5, id="query", required=True, cls="uk-textarea h-full p-4", placeholder="Write any question to LLM..."),
+                DivRAligned(Button("Ask", id='ask', type="submit", cls=(ButtonT.primary)),
+                cls="mt-4")) 
+
+DiscussionCard = Card(PromptForm, Div(id="discussion"),  
     header = (H3('Discussion'), Subtitle('Research discussion with selected transcripts')),
-    body_cls='pt-0'
-)    
+    body_cls='pt-0 flex-1 space-y-4')    
 
 ModelCard = Card(
     NavContainer(
@@ -166,7 +163,8 @@ CenterPanel = Ul(id="component-nav", cls="uk-switcher mt-4 w-2/3")(
 """
 LeftPanel = Div(cls="w-1/4")(TranscriptsCard)
 CenterPanel = Div(cls="w-1/2")(DiscussionCard)            
-RightPanel = Div(cls="space-y-4 w-1/4")(SourcesCard, ModelCard)
+RightPanel = Div(cls="space-y-4 w-1/4")(SourcesCard, #ModelCard
+                                        )
 
 AppPage =  Container(
     Header,

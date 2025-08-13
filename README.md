@@ -1,4 +1,4 @@
-# notebooklm-fasthtml
+# Socioscope-notebook
 
 ## Install
 ```shell

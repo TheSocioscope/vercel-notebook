@@ -12,7 +12,18 @@ DB_NAME = "socioscope_db"
 COLLECTION_NAME = "socioscope_documents"
 
 # Choose a theme color (blue, green, red, etc)
-hdrs = Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True)
+css = Style("""
+.uk-switcher .w-1\/4, .uk-switcher .w-1\/2 {width:100%;}
+@media screen and (min-width: 1260px) {
+    .uk-switcher>:not(.uk-active), .uk-switcher {display:flex} 
+    .uk-tab-alt {display:none}
+    .uk-switcher .w-1\/4 {width:25%}
+    .uk-switcher .w-1\/2 {width:50%;}
+    .uk-card {width:100%}
+} 
+"""
+)
+hdrs = (Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True), css)
 
 # Create your app with the theme
 app, rt = fast_app(hdrs=hdrs, live=True)
@@ -183,14 +194,25 @@ CenterPanel = Ul(id="component-nav", cls="uk-switcher mt-4 w-2/3")(
             Li(cls="uk-active") (TranscriptsCard(),
             *map(Li, [DiscussionCard(), ParamsCard()])))
 """
-LeftPanel = Div(cls="w-1/4")(TranscriptsCard)
-CenterPanel = Div(cls="w-1/2")(DiscussionCard)            
-RightPanel = Div(cls="space-y-4 w-1/4")(SourcesCard, #ModelCard
+LeftPanel = Div(TranscriptsCard)
+CenterPanel = Div(DiscussionCard)            
+RightPanel = Div(SourcesCard, #ModelCard
                                         )
+Tabs = (TabContainer(
+            Li(A("Transcripts", href='#', cls='uk-active')),
+            Li(A("Discussions", href='#')),
+            Li(A("Sources", href='#')),
+            uk_switcher='connect: #component-nav; animation: uk-animation-fade',
+            alt=True),
+        Div(id="component-nav", cls="flex uk-switcher gap-x-8 m-0")(
+            Div(cls="w-1/4 ")(TranscriptsCard),
+            Div(cls="w-1/2")(DiscussionCard),
+            Div(cls="w-1/4")(SourcesCard)))
 
 AppPage =  Container(
     Header,
-    Div(cls="flex gap-x-8 m-0")(LeftPanel, CenterPanel, RightPanel),
+    Tabs,
+    #Div(cls="flex gap-x-8 m-0")(LeftPanel, CenterPanel, RightPanel),
     cls="uk-container-expand m-0 p-4"
 )
 

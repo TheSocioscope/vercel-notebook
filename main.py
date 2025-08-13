@@ -13,12 +13,12 @@ COLLECTION_NAME = "socioscope_documents"
 
 # Choose a theme color (blue, green, red, etc)
 css = Style("""
-.uk-switcher .w-1\/4, .uk-switcher .w-1\/2 {width:100%;}
+.uk-switcher .w-1/4, .uk-switcher .w-1/2 {width:100%;}
 @media screen and (min-width: 1260px) {
     .uk-switcher>:not(.uk-active), .uk-switcher {display:flex} 
     .uk-tab-alt {display:none}
-    .uk-switcher .w-1\/4 {width:25%}
-    .uk-switcher .w-1\/2 {width:50%;}
+    .uk-switcher .w-1/4 {width:25%}
+    .uk-switcher .w-1/2 {width:50%;}
     .uk-card {width:100%}
 } 
 """
@@ -59,12 +59,20 @@ def select(transcript:str):
 @threaded
 def rag_task(docs:list[dict], query:str):
     print(f'LOG: Send "{query}" for RAG on {len(docs)} documents...')
-    response = send_rag(docs=docs, message=query)
-    discussion.insert(Message(order=len(discussion())+1, model='openai:gpt-4o-mini', 
-                              question=response['question'], 
-                              contents=response['contents'], 
-                              responses=response['responses'], 
-                              final_response=response['final_response']))
+    try:
+        response = send_rag(docs=docs, message=query)
+    except:
+        discussion.insert(Message(order=len(discussion())+1, model='openai:gpt-4o-mini', 
+            question=query, 
+            contents=docs, 
+            responses=[], 
+            final_response='Sorry error in the request, please try again.'))
+    else:
+        discussion.insert(Message(order=len(discussion())+1, model='openai:gpt-4o-mini', 
+            question=response['question'], 
+            contents=response['contents'], 
+            responses=response['responses'], 
+            final_response=response['final_response']))
 
 @rt
 def rag_response(query:str):
@@ -92,7 +100,7 @@ def ask(query:str):
         rag_task(docs, query)
         return rag_response(query)
     else:
-        return (PromptForm(query), Div(cls="uk-card-secondary p-4 mt-4")("Please select at least one source in the left panel."))
+        return (PromptForm(query), Div(cls="uk-card-secondary p-4 mt-4")("Please select at least one source in the transcripts panel."))
 
 def PromptForm(query:str=''): 
     return Form(hx_target='#discussion', hx_post=ask, hx_swap='innerHTML')(

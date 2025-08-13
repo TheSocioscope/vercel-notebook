@@ -204,7 +204,7 @@ Tabs = (TabContainer(
             Li(A("Sources", href='#')),
             uk_switcher='connect: #component-nav; animation: uk-animation-fade',
             alt=True),
-        Div(id="component-nav", cls="flex uk-switcher gap-x-8 m-0")(
+        Div(id="component-nav", cls="flex uk-switcher gap-x-8 mt-4")(
             Div(cls="w-1/4 ")(TranscriptsCard),
             Div(cls="w-1/2")(DiscussionCard),
             Div(cls="w-1/4")(SourcesCard)))

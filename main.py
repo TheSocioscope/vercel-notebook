@@ -13,14 +13,14 @@ COLLECTION_NAME = "socioscope_documents"
 
 # Choose a theme color (blue, green, red, etc)
 css = Style("""
-.uk-switcher .w-1/4, .uk-switcher .w-1/2 {width:100%;}
-@media screen and (min-width: 1260px) {
-    .uk-switcher>:not(.uk-active), .uk-switcher {display:flex} 
-    .uk-tab-alt {display:none}
-    .uk-switcher .w-1/4 {width:25%}
-    .uk-switcher .w-1/2 {width:50%;}
-    .uk-card {width:100%}
-} 
+    .uk-switcher .w-1\/4, .uk-switcher .w-1\/2 {width:100%;}
+    @media screen and (min-width: 1260px) {
+        .uk-switcher>:not(.uk-active), .uk-switcher {display:flex} 
+        .uk-tab-alt {display:none}
+        .uk-switcher .w-1\/4 {width:25%}
+        .uk-switcher .w-1\/2 {width:50%;}
+        .uk-card {width:100%}
+    } 
 """
 )
 hdrs = (Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True), css)

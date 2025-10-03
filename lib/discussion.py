@@ -17,7 +17,7 @@ class Message:
 def send_rag(docs, message, model="openai:gpt-5-nano"):
     response = requests.post(
         url=RAG_API_ENPOINT,
-        json={"docs":docs, "message":message, "model":model}),
-        headers={"Modal-Key": RAG_API_KEY, "Modal-Secret": RAG_API_SECRET}
+        json={"docs":docs, "message":message, "model":model},
+        headers={"Modal-Key": RAG_API_KEY, "Modal-Secret": RAG_API_SECRET})
     return response.json()
     

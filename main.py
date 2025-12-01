@@ -245,4 +245,9 @@ def authenticate(login: Login):
     auth.login(login.id, login.secret)
     return RedirectResponse(url='/')
 
-serve()
+# For local development
+if __name__ == "__main__":
+    serve()
+
+# For Vercel deployment - export the ASGI application
+application = app

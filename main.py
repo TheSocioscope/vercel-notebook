@@ -88,7 +88,7 @@ def rag_task(docs: list[dict], query: str):
         discussion.insert(
             Message(
                 order=len(discussion()) + 1,
-                model="openai:gpt-4o-mini",
+                model="qwen/qwen3-32b",
                 question=query,
                 contents=docs,
                 responses=[],
@@ -99,7 +99,7 @@ def rag_task(docs: list[dict], query: str):
         discussion.insert(
             Message(
                 order=len(discussion()) + 1,
-                model="openai:gpt-4o-mini",
+                model="qwen/qwen3-32b",
                 question=response["question"],
                 contents=response["contents"],
                 responses=response["responses"],

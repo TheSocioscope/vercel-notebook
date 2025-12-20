@@ -3,6 +3,8 @@ from fasthtml.svg import *
 from fasthtml.common import *
 from monsterui.all import *
 from dotenv import load_dotenv
+import markdown
+import re
 from lib.discussion import *
 from lib.sources import *
 from lib.auth import *
@@ -10,6 +12,44 @@ from lib.auth import *
 load_dotenv()
 
 DB_NAME = "socioscope_db"
+
+
+def parse_thinking(response: str):
+    """Parse <think> blocks from LLM response and return (thinking, answer) tuple."""
+    think_pattern = re.compile(r'<think>(.*?)</think>', re.DOTALL)
+    thinking_blocks = think_pattern.findall(response)
+    answer = think_pattern.sub('', response).strip()
+    thinking = '\n\n'.join(thinking_blocks).strip() if thinking_blocks else None
+    return thinking, answer
+
+
+def render_response(response: str):
+    """Render LLM response with thinking blocks displayed separately."""
+    thinking, answer = parse_thinking(response)
+    elements = []
+    
+    if thinking:
+        elements.append(
+            Details(
+                Summary("💭 Model Thinking", cls="thinking-summary"),
+                Div(
+                    NotStr(markdown.markdown(thinking, extensions=['fenced_code', 'tables'])),
+                    cls="thinking-content prose"
+                ),
+                cls="thinking-block"
+            )
+        )
+    
+    elements.append(
+        Div(
+            NotStr(markdown.markdown(answer, extensions=['fenced_code', 'tables'])),
+            cls="prose max-w-none"
+        )
+    )
+    
+    return Div(*elements, cls="uk-card-secondary mt-4 p-4")
+
+
 COLLECTION_NAME = "socioscope_documents"
 
 # Choose a theme color (blue, green, red, etc)
@@ -22,7 +62,35 @@ css = Style(
         .uk-switcher .w-1/4 {width:25%}
         .uk-switcher .w-1/2 {width:50%;}
         .uk-card {width:100%}
-    } 
+    }
+    /* Markdown styling */
+    .prose h1, .prose h2, .prose h3, .prose h4 { margin-top: 1em; margin-bottom: 0.5em; font-weight: 600; }
+    .prose h1 { font-size: 1.5em; }
+    .prose h2 { font-size: 1.25em; }
+    .prose h3 { font-size: 1.1em; }
+    .prose p { margin-bottom: 0.75em; line-height: 1.6; }
+    .prose ul, .prose ol { margin-left: 1.5em; margin-bottom: 0.75em; padding-left: 0.5em; }
+    .prose ul { list-style-type: disc; }
+    .prose ul ul { list-style-type: circle; }
+    .prose ul ul ul { list-style-type: square; }
+    .prose ol { list-style-type: decimal; }
+    .prose ol ol { list-style-type: lower-alpha; }
+    .prose ol ol ol { list-style-type: lower-roman; }
+    .prose li { margin-bottom: 0.25em; line-height: 1.5; }
+    .prose li::marker { color: rgba(255,255,255,0.7); }
+    .prose code { background: rgba(0,0,0,0.2); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+    .prose pre { background: rgba(0,0,0,0.3); padding: 1em; border-radius: 6px; overflow-x: auto; margin-bottom: 1em; }
+    .prose pre code { background: none; padding: 0; }
+    .prose blockquote { border-left: 3px solid rgba(255,255,255,0.3); padding-left: 1em; margin-left: 0; font-style: italic; }
+    .prose table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+    .prose th, .prose td { border: 1px solid rgba(255,255,255,0.2); padding: 0.5em; text-align: left; }
+    .prose strong { font-weight: 600; }
+    /* Thinking block styling */
+    .thinking-block { margin-bottom: 1em; border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; background: rgba(0,0,0,0.15); }
+    .thinking-summary { cursor: pointer; padding: 0.75em 1em; font-weight: 500; color: rgba(255,255,255,0.7); user-select: none; }
+    .thinking-summary:hover { color: rgba(255,255,255,0.9); }
+    .thinking-content { padding: 0 1em 1em 1em; font-size: 0.9em; color: rgba(255,255,255,0.65); border-top: 1px solid rgba(255,255,255,0.1); }
+    details[open] .thinking-summary { border-bottom: none; }
 """
 )
 hdrs = (Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True), css)
@@ -113,12 +181,7 @@ def rag_response(query: str):
     if discussion():
         return (
             PromptForm(query),
-            Div(
-                *map(
-                    P(cls="uk-card-secondary mt-4 p-4", header=None),
-                    [m.final_response for m in discussion()],
-                )
-            ),
+            Div(*[render_response(m.final_response) for m in discussion()]),
         )
     else:
         return (

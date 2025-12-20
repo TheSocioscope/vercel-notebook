@@ -21,7 +21,7 @@ client = Groq(api_key=GROQ_API_KEY)
 
 SYSTEM_PROMPT = """You're a helpful AI academic research assistant.
 Given a user question and some provided documents, answer the user question.
-If none of the documents answer the question, just say you don't know."""
+If none of the documents answer the question, just say you don't know. Format your final answer in markdown."""
 
 REDUCE_PROMPT = """The following is a set of intermediate responses:
 {responses}

@@ -5,7 +5,7 @@ from monsterui.all import *
 from dotenv import load_dotenv
 from lib.discussion import *
 from lib.sources import *
-from lib.auth import *
+from lib.auth import generate_magic_link, verify_token, is_email_allowed, MagicLinkRequest
 
 load_dotenv()
 
@@ -29,7 +29,6 @@ hdrs = (Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True), c
 
 # Create your app with the theme
 app, rt = fast_app(hdrs=hdrs, live=True)
-auth = Auth()
 db = database(":memory:")
 sources = db.create(Source, pk="filename")
 discussion = db.create(Message, pk="order")
@@ -277,22 +276,26 @@ ModelCard = Card(
     body_cls="pt-0",
 )
 
-LoginPage = Container(
-    DivRAligned(cls=(TextT.bold))("SOCIOSCOPE"),
-    DivCentered(cls="flex-1 p-16")(
-        DivVStacked(
-            H3("Authentication"),
-            Form(method="post", action="/authenticate")(
-                Fieldset(
-                    LabelInput(label="User", id="id"),
-                    LabelInput(label="Password", type="password", id="secret"),
+
+def LoginPage(message: str = None):
+    return Container(
+        DivRAligned(cls=(TextT.bold))("SOCIOSCOPE"),
+        DivCentered(cls="flex-1 p-16")(
+            DivVStacked(
+                H3("Authentication"),
+                P("Enter your email to receive a magic link."),
+                Form(method="post", action="/auth")(
+                    Fieldset(
+                        LabelInput(label="Email", id="email", type="email", required=True),
+                    ),
+                    Button("Send Magic Link", type="submit", cls=(ButtonT.primary, "w-full")),
+                    cls="space-y-6",
                 ),
-                Button("Login", type="submit", cls=(ButtonT.primary, "w-full")),
-                cls="space-y-6",
-            ),
-        )
-    ),
-)
+                P(message, cls="mt-4 text-center") if message else None,
+            )
+        ),
+    )
+
 
 Header = (
     DivRAligned(
@@ -339,30 +342,48 @@ AppPage = Container(
 
 
 @rt
-def index():
-    return (
-        (Title("Socioscope"), AppPage())
-        if auth.authenticate()
-        else RedirectResponse(url="/login")
-    )
+def index(session):
+    """Main app - requires login."""
+    if session.get("email"):
+        return (Title("Socioscope"), AppPage())
+    return RedirectResponse(url="/auth")
+
+
+@rt("/auth")
+def get(session, token: str = None):
+    """Handle GET /auth - show login form or verify magic link token."""
+    # If already logged in, go to app
+    if session.get("email"):
+        return RedirectResponse(url="/")
+
+    # If token provided, verify it
+    if token:
+        success, result = verify_token(token)
+        if success:
+            session["email"] = result  # Store email in session cookie
+            print(f"LOG:\tUser logged in: {result}")
+            return RedirectResponse(url="/")
+        else:
+            return (Title("Socioscope"), LoginPage(message=f"❌ {result}"))
+
+    # No token, show login form
+    return (Title("Socioscope"), LoginPage())
+
+
+@rt("/auth")
+def post(req: MagicLinkRequest):
+    """Handle POST /auth - generate and print magic link."""
+    if not is_email_allowed(req.email):
+        return (Title("Socioscope"), LoginPage(message="❌ Email domain not authorized."))
+    generate_magic_link(req.email)
+    return (Title("Socioscope"), LoginPage(message=f"✅ Magic link sent! Check the console."))
 
 
 @rt
-def login():
-    return index() if auth.authenticate() else (Title("Socioscope"), LoginPage())
-
-
-@rt
-def logout():
-    auth.logout()
-    return login()
-
-
-@rt
-def authenticate(login: Login):
-    print(f"LOG:\tAuthenticate with id={login.id}")
-    auth.login(login.id, login.secret)
-    return RedirectResponse(url="/")
+def logout(session):
+    """Clear session and redirect to login."""
+    session.clear()
+    return RedirectResponse(url="/auth")
 
 
 # For local development

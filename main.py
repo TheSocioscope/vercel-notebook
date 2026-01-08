@@ -1,3 +1,4 @@
+import os
 from fastlite import *
 from fasthtml.svg import *
 from fasthtml.common import *
@@ -7,9 +8,15 @@ import markdown
 import re
 from lib.discussion import *
 from lib.sources import *
-from lib.auth import *
+from lib.auth import generate_magic_link, verify_token, is_email_allowed, MagicLinkRequest
 
 load_dotenv()
+
+# Session security configuration
+SESSION_SECRET = os.getenv("SESSION_SECRET")
+if not SESSION_SECRET:
+    raise ValueError("SESSION_SECRET env var not set - generate with: python -c \"import secrets; print(secrets.token_hex(32))\"")
+IS_PRODUCTION = os.getenv("VERCEL_ENV") == "production"
 
 DB_NAME = "socioscope_db"
 
@@ -51,6 +58,7 @@ def render_response(response: str):
 
 
 COLLECTION_NAME = "socioscope_documents"
+MAX_SESSION_AGE = 7 * 24 * 3600  # days x hours x minutes
 
 # Choose a theme color (blue, green, red, etc)
 css = Style(
@@ -95,9 +103,16 @@ css = Style(
 )
 hdrs = (Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True), css)
 
-# Create your app with the theme
-app, rt = fast_app(hdrs=hdrs, live=True)
-auth = Auth()
+# Create your app with the theme and secure session config
+app, rt = fast_app(
+    hdrs=hdrs,
+    live=not IS_PRODUCTION,
+    secret_key=SESSION_SECRET,
+    sess_cookie="socioscope_session",
+    max_age=MAX_SESSION_AGE,
+    sess_https_only=IS_PRODUCTION,  # HTTPS-only in production
+    same_site="lax",
+)
 db = database(":memory:")
 sources = db.create(Source, pk="filename")
 discussion = db.create(Message, pk="order")
@@ -340,22 +355,39 @@ ModelCard = Card(
     body_cls="pt-0",
 )
 
-LoginPage = Container(
-    DivRAligned(cls=(TextT.bold))("SOCIOSCOPE"),
-    DivCentered(cls="flex-1 p-16")(
-        DivVStacked(
-            H3("Authentication"),
-            Form(method="post", action="/authenticate")(
-                Fieldset(
-                    LabelInput(label="User", id="id"),
-                    LabelInput(label="Password", type="password", id="secret"),
+
+def LoginPage(message: str = None):
+    return Container(
+        DivRAligned(cls=(TextT.bold))("SOCIOSCOPE"),
+        DivCentered(cls="flex-1 p-16")(
+            DivVStacked(
+                H3("Authentication"),
+                P("Enter your email to receive a magic link."),
+                Form(
+                    id="login-form",
+                    hx_post="/auth",
+                    hx_target="#login-message",
+                    hx_swap="innerHTML",
+                    hx_disabled_elt="#submit-btn",
+                )(
+                    Fieldset(
+                        LabelInput(label="Email", id="email", type="email", required=True),
+                    ),
+                    Button(
+                        "Send Magic Link",
+                        id="submit-btn",
+                        type="submit",
+                        cls=(ButtonT.primary, "w-full"),
+                    ),
+                    cls="space-y-6",
                 ),
-                Button("Login", type="submit", cls=(ButtonT.primary, "w-full")),
-                cls="space-y-6",
-            ),
-        )
-    ),
-)
+                Div(id="login-message", cls="mt-4 text-center")(
+                    P(message) if message else None
+                ),
+            )
+        ),
+    )
+
 
 Header = (
     DivRAligned(
@@ -402,30 +434,66 @@ AppPage = Container(
 
 
 @rt
-def index():
-    return (
-        (Title("Socioscope"), AppPage())
-        if auth.authenticate()
-        else RedirectResponse(url="/login")
-    )
+def index(session):
+    """Main app - requires login."""
+    if session.get("email"):
+        return (Title("Socioscope"), AppPage())
+    return RedirectResponse(url="/auth")
+
+
+@rt("/auth")
+def get(session, token: str = None):
+    """Handle GET /auth - show login form or verify magic link token."""
+    # If already logged in, go to app
+    if session.get("email"):
+        return RedirectResponse(url="/")
+
+    # If token provided, verify it
+    if token:
+        success, result = verify_token(token)
+        if success:
+            session["email"] = result  # Store email in session cookie
+            print(f"LOG:\tUser logged in: {result}")
+            return RedirectResponse(url="/")
+        else:
+            return (Title("Socioscope"), LoginPage(message=f"❌ {result}"))
+
+    # No token, show login form
+    return (Title("Socioscope"), LoginPage())
+
+
+@rt("/auth")
+def post(req: MagicLinkRequest, request):
+    """Handle POST /auth - generate and print magic link."""
+    is_htmx = request.headers.get("HX-Request") == "true"
+
+    if not is_email_allowed(req.email):
+        if is_htmx:
+            return P("❌ Email domain not authorized.")
+        return (Title("Socioscope"), LoginPage(message="❌ Email domain not authorized."))
+
+    # Build base URL from request or environment
+    vercel_url = os.getenv("VERCEL_URL")
+    if vercel_url:
+        base_url = f"https://{vercel_url}"
+    else:
+        # Fallback to request host for local dev
+        host = request.headers.get("host", "localhost:5001")
+        scheme = "https" if IS_PRODUCTION else "http"
+        base_url = f"{scheme}://{host}"
+
+    generate_magic_link(req.email, base_url=base_url)
+
+    if is_htmx:
+        return P("✅ Magic link sent! Check your email.")
+    return (Title("Socioscope"), LoginPage(message=f"✅ Magic link sent! Check your email."))
 
 
 @rt
-def login():
-    return index() if auth.authenticate() else (Title("Socioscope"), LoginPage())
-
-
-@rt
-def logout():
-    auth.logout()
-    return login()
-
-
-@rt
-def authenticate(login: Login):
-    print(f"LOG:\tAuthenticate with id={login.id}")
-    auth.login(login.id, login.secret)
-    return RedirectResponse(url="/")
+def logout(session):
+    """Clear session and redirect to login."""
+    session.clear()
+    return RedirectResponse(url="/auth")
 
 
 # For local development

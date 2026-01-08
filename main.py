@@ -1,3 +1,4 @@
+import os
 from fastlite import *
 from fasthtml.svg import *
 from fasthtml.common import *
@@ -9,8 +10,15 @@ from lib.auth import generate_magic_link, verify_token, is_email_allowed, MagicL
 
 load_dotenv()
 
+# Session security configuration
+SESSION_SECRET = os.getenv("SESSION_SECRET")
+if not SESSION_SECRET:
+    raise ValueError("SESSION_SECRET env var not set - generate with: python -c \"import secrets; print(secrets.token_hex(32))\"")
+IS_PRODUCTION = os.getenv("VERCEL_ENV") == "production"
+
 DB_NAME = "socioscope_db"
 COLLECTION_NAME = "socioscope_documents"
+MAX_SESSION_AGE = 7 * 24 * 3600  # days x hours x minutes
 
 # Choose a theme color (blue, green, red, etc)
 css = Style(
@@ -27,8 +35,16 @@ css = Style(
 )
 hdrs = (Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True), css)
 
-# Create your app with the theme
-app, rt = fast_app(hdrs=hdrs, live=True)
+# Create your app with the theme and secure session config
+app, rt = fast_app(
+    hdrs=hdrs,
+    live=not IS_PRODUCTION,
+    secret_key=SESSION_SECRET,
+    sess_cookie="socioscope_session",
+    max_age=MAX_SESSION_AGE,
+    sess_https_only=IS_PRODUCTION,  # HTTPS-only in production
+    same_site="lax",
+)
 db = database(":memory:")
 sources = db.create(Source, pk="filename")
 discussion = db.create(Message, pk="order")
@@ -284,14 +300,27 @@ def LoginPage(message: str = None):
             DivVStacked(
                 H3("Authentication"),
                 P("Enter your email to receive a magic link."),
-                Form(method="post", action="/auth")(
+                Form(
+                    id="login-form",
+                    hx_post="/auth",
+                    hx_target="#login-message",
+                    hx_swap="innerHTML",
+                    hx_disabled_elt="#submit-btn",
+                )(
                     Fieldset(
                         LabelInput(label="Email", id="email", type="email", required=True),
                     ),
-                    Button("Send Magic Link", type="submit", cls=(ButtonT.primary, "w-full")),
+                    Button(
+                        "Send Magic Link",
+                        id="submit-btn",
+                        type="submit",
+                        cls=(ButtonT.primary, "w-full"),
+                    ),
                     cls="space-y-6",
                 ),
-                P(message, cls="mt-4 text-center") if message else None,
+                Div(id="login-message", cls="mt-4 text-center")(
+                    P(message) if message else None
+                ),
             )
         ),
     )
@@ -371,12 +400,30 @@ def get(session, token: str = None):
 
 
 @rt("/auth")
-def post(req: MagicLinkRequest):
+def post(req: MagicLinkRequest, request):
     """Handle POST /auth - generate and print magic link."""
+    is_htmx = request.headers.get("HX-Request") == "true"
+
     if not is_email_allowed(req.email):
+        if is_htmx:
+            return P("❌ Email domain not authorized.")
         return (Title("Socioscope"), LoginPage(message="❌ Email domain not authorized."))
-    generate_magic_link(req.email)
-    return (Title("Socioscope"), LoginPage(message=f"✅ Magic link sent! Check the console."))
+
+    # Build base URL from request or environment
+    vercel_url = os.getenv("VERCEL_URL")
+    if vercel_url:
+        base_url = f"https://{vercel_url}"
+    else:
+        # Fallback to request host for local dev
+        host = request.headers.get("host", "localhost:5001")
+        scheme = "https" if IS_PRODUCTION else "http"
+        base_url = f"{scheme}://{host}"
+
+    generate_magic_link(req.email, base_url=base_url)
+
+    if is_htmx:
+        return P("✅ Magic link sent! Check your email.")
+    return (Title("Socioscope"), LoginPage(message=f"✅ Magic link sent! Check your email."))
 
 
 @rt

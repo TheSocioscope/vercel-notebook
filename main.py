@@ -34,7 +34,7 @@ def render_response(response: str):
     """Render LLM response with thinking blocks displayed separately."""
     thinking, answer = parse_thinking(response)
     elements = []
-    
+
     if thinking:
         elements.append(
             Details(
@@ -46,14 +46,14 @@ def render_response(response: str):
                 cls="thinking-block"
             )
         )
-    
+
     elements.append(
         Div(
             NotStr(markdown.markdown(answer, extensions=['fenced_code', 'tables'])),
             cls="prose max-w-none"
         )
     )
-    
+
     return Div(*elements, cls="uk-card-secondary mt-4 p-4")
 
 
@@ -472,16 +472,7 @@ def post(req: MagicLinkRequest, request):
             return P("❌ Email domain not authorized.")
         return (Title("Socioscope"), LoginPage(message="❌ Email domain not authorized."))
 
-    # Build base URL from request or environment
-    vercel_url = os.getenv("VERCEL_URL")
-    if vercel_url:
-        base_url = f"https://{vercel_url}"
-    else:
-        # Fallback to request host for local dev
-        host = request.headers.get("host", "localhost:5001")
-        scheme = "https" if IS_PRODUCTION else "http"
-        base_url = f"{scheme}://{host}"
-
+    base_url = os.getenv("BASE_URL", "http://localhost:5001")
     generate_magic_link(req.email, base_url=base_url)
 
     if is_htmx:

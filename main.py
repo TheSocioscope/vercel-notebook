@@ -2,13 +2,14 @@ import os
 from fastlite import *
 from fasthtml.svg import *
 from fasthtml.common import *
+from starlette.responses import Response
 from monsterui.all import *
 from dotenv import load_dotenv
 import markdown
 import re
 from lib.discussion import *
 from lib.sources import *
-from lib.auth import generate_magic_link, verify_token, is_email_allowed, MagicLinkRequest
+from lib.auth import verify_credentials, LoginRequest
 
 load_dotenv()
 
@@ -58,7 +59,6 @@ def render_response(response: str):
 
 
 COLLECTION_NAME = "socioscope_documents"
-MAX_SESSION_AGE = 7 * 24 * 3600  # days x hours x minutes
 
 # Choose a theme color (blue, green, red, etc)
 css = Style(
@@ -109,7 +109,6 @@ app, rt = fast_app(
     live=not IS_PRODUCTION,
     secret_key=SESSION_SECRET,
     sess_cookie="socioscope_session",
-    max_age=MAX_SESSION_AGE,
     sess_https_only=IS_PRODUCTION,  # HTTPS-only in production
     same_site="lax",
 )
@@ -362,7 +361,7 @@ def LoginPage(message: str = None):
         DivCentered(cls="flex-1 p-16")(
             DivVStacked(
                 H3("Authentication"),
-                P("Enter your email to receive a magic link."),
+                P("Enter your credentials to log in."),
                 Form(
                     id="login-form",
                     hx_post="/auth",
@@ -371,10 +370,12 @@ def LoginPage(message: str = None):
                     hx_disabled_elt="#submit-btn",
                 )(
                     Fieldset(
-                        LabelInput(label="Email", id="email", type="email", required=True),
+                        LabelInput(label="Username", id="username", type="text", required=True),
+                        LabelInput(label="Password", id="password", type="password", required=True),
+                        cls="space-y-4",
                     ),
                     Button(
-                        "Send Magic Link",
+                        "Log In",
                         id="submit-btn",
                         type="submit",
                         cls=(ButtonT.primary, "w-full"),
@@ -391,7 +392,6 @@ def LoginPage(message: str = None):
 
 Header = (
     DivRAligned(
-        Button(A("Logout", href="/logout"), cls=ButtonT.ghost),
         P(cls=(TextT.bold))("SOCIOSCOPE"),
     ),
 )
@@ -436,55 +436,38 @@ AppPage = Container(
 @rt
 def index(session):
     """Main app - requires login."""
-    if session.get("email"):
+    if session.get("user"):
         return (Title("Socioscope"), AppPage())
     return RedirectResponse(url="/auth")
 
 
 @rt("/auth")
-def get(session, token: str = None):
-    """Handle GET /auth - show login form or verify magic link token."""
+def get(session):
+    """Handle GET /auth - show login form."""
     # If already logged in, go to app
-    if session.get("email"):
+    if session.get("user"):
         return RedirectResponse(url="/")
 
-    # If token provided, verify it
-    if token:
-        success, result = verify_token(token)
-        if success:
-            session["email"] = result  # Store email in session cookie
-            print(f"LOG:\tUser logged in: {result}")
-            return RedirectResponse(url="/")
-        else:
-            return (Title("Socioscope"), LoginPage(message=f"❌ {result}"))
-
-    # No token, show login form
+    # Show login form
     return (Title("Socioscope"), LoginPage())
 
 
 @rt("/auth")
-def post(req: MagicLinkRequest, request):
-    """Handle POST /auth - generate and print magic link."""
+def post(session, req: LoginRequest, request):
+    """Handle POST /auth - validate credentials and log in."""
     is_htmx = request.headers.get("HX-Request") == "true"
 
-    if not is_email_allowed(req.email):
+    if verify_credentials(req.username, req.password):
+        session["user"] = req.username
+        print(f"LOG:\tUser logged in: {req.username}")
+        # For HTMX, return a redirect header
         if is_htmx:
-            return P("❌ Email domain not authorized.")
-        return (Title("Socioscope"), LoginPage(message="❌ Email domain not authorized."))
-
-    base_url = os.getenv("BASE_URL", "http://localhost:5001")
-    generate_magic_link(req.email, base_url=base_url)
+            return Response(headers={"HX-Redirect": "/"})
+        return RedirectResponse(url="/")
 
     if is_htmx:
-        return P("✅ Magic link sent! Check your email.")
-    return (Title("Socioscope"), LoginPage(message=f"✅ Magic link sent! Check your email."))
-
-
-@rt
-def logout(session):
-    """Clear session and redirect to login."""
-    session.clear()
-    return RedirectResponse(url="/auth")
+        return P("❌ Invalid username or password.")
+    return (Title("Socioscope"), LoginPage(message="❌ Invalid username or password."))
 
 
 # For local development

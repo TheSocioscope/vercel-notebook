@@ -56,6 +56,7 @@ def TranscriptsSkeleton():
         hx_get="/load-transcripts",
         hx_trigger="load",
         hx_swap="outerHTML",
+        cls="h-full border-r border-[hsl(var(--border))]",
     )(
         Card(
             Div(cls="space-y-3 p-2")(
@@ -70,14 +71,14 @@ def TranscriptsSkeleton():
             ),
             header=(H3("Transcripts"), Subtitle("Loading from database...")),
             body_cls="pt-0",
-            cls="rounded-none shadow-none border-none",
+            cls="rounded-none shadow-none border-none border-r border-[hsl(var(--border))]",
         )
     )
 
 
 def TranscriptsCard(transcript_nav: dict, count: int):
     """Render the full transcripts card with navigation."""
-    return Div(id="transcripts-container", cls="bg-red-500 h-full")(
+    return Div(id="transcripts-container", cls="h-full border-r border-[hsl(var(--border))]")(
         Card(
             Accordion(
                 *[
@@ -89,7 +90,7 @@ def TranscriptsCard(transcript_nav: dict, count: int):
             ),
             header=(H3("Transcripts"), Subtitle(f"Available transcripts ({count})")),
             body_cls="pt-0 overflow-y-auto flex-1 min-h-0",
-            cls="rounded-none shadow-none border-none h-full flex flex-col",
+            cls="rounded-none shadow-none border-none",
         )
     )
 

@@ -91,8 +91,6 @@ css = Style(
     .transcript-viewer {
         max-height: 100%;
         overflow-y: auto;
-        border-radius: var(--uk-global-radius);
-        border: 1px solid hsl(var(--border));
         background: hsl(var(--background));
     }
     .transcript-header {
@@ -101,7 +99,6 @@ css = Style(
         /* Using background with 95% opacity for blur effect */
         background: hsl(var(--background) / 0.95);
         padding: 1rem;
-        border-bottom: 1px solid hsl(var(--border));
         z-index: 10;
         backdrop-filter: blur(8px);
     }

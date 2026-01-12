@@ -240,11 +240,6 @@ css = Style(
         justify-content: space-between;
         gap: 0.5rem;
     }
-    /* Right panel tabs */
-    .right-panel-tabs {
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-        margin-bottom: 1rem;
-    }
 """
 )
 
@@ -543,48 +538,6 @@ def TranscriptSegmentRow(segment: dict, speaker_index: int):
     )
 
 
-def TranscriptViewer(metadata: dict, segments: list[dict], speakers: list[str]):
-    """Full transcript viewer with metadata header and conversation display."""
-    speaker_colors = ['#f59e0b', '#10b981', '#6366f1', '#ec4899', '#14b8a6', '#f97316', '#8b5cf6', '#06b6d4']
-    speaker_to_index = {s: i for i, s in enumerate(speakers)}
-
-    legend_items = [
-        Div(cls="legend-item")(
-            Div(cls="legend-dot", style=f"background: {speaker_colors[i % 8]}"),
-            Span(speaker, cls=f"speaker-{i % 8}")
-        )
-        for i, speaker in enumerate(speakers)
-    ]
-
-    return Div(cls="transcript-viewer")(
-        Div(cls="transcript-header")(
-            H4(metadata.get("NAME", "Transcript"), cls="mb-2"),
-            Div(cls="transcript-meta")(
-                Div(cls="transcript-meta-item")(
-                    Span("Project:", cls="transcript-meta-label"),
-                    Span(metadata.get("PROJECT", "-"))
-                ),
-                Div(cls="transcript-meta-item")(
-                    Span("Location:", cls="transcript-meta-label"),
-                    Span(f"{metadata.get('GEOGRAPHY', '-')}, {metadata.get('COUNTRY', '-')}")
-                ),
-                Div(cls="transcript-meta-item")(
-                    Span("Date:", cls="transcript-meta-label"),
-                    Span(f"{metadata.get('MONTH', '-')} {metadata.get('YEAR', '-')}")
-                ),
-                Div(cls="transcript-meta-item")(
-                    Span("Type:", cls="transcript-meta-label"),
-                    Span(metadata.get("TYPE", "-"))
-                ),
-            ),
-            Div(cls="transcript-legend")(*legend_items) if len(speakers) > 1 else None
-        ),
-        Div(cls="transcript-content")(
-            *[TranscriptSegmentRow(seg, speaker_to_index.get(seg["speaker"], 0)) for seg in segments]
-        ) if segments else Div(cls="p-4 text-center opacity-50")("No transcript segments found.")
-    )
-
-
 _TRANSCRIPT_CACHE_MAX = 8
 _transcript_cache: dict[str, dict] = {}
 _transcript_cache_order: list[str] = []
@@ -758,55 +711,6 @@ async def read_transcript_chunk(filename: str, offset: int = 200, limit: int = 2
         *[TranscriptSegmentRow(seg, speaker_to_index.get(seg["speaker"], 0)) for seg in chunk],
         TranscriptLoadMoreSentinel(filename, offset + limit, limit) if (offset + limit) < total else None,
     )
-
-
-DiscussionCard = Card(
-    Div(id="discussion")(PromptForm()),
-    header=(
-        H3("Discussion"),
-        Subtitle("Research discussion with selected transcripts"),
-    ),
-    body_cls="pt-0 flex-1 space-y-4",
-)
-
-ModelCard = Card(
-    NavContainer(
-        Select(
-            Optgroup(
-                map(
-                    Option,
-                    (
-                        "text-davinci-003",
-                        "text-curie-001",
-                        "text-babbage-001",
-                        "text-ada-001",
-                    ),
-                ),
-                label="GPT-3",
-            ),
-            Optgroup(
-                map(
-                    Option,
-                    (
-                        "mistral-medium-2505",
-                        "magistral-medium-2506",
-                        "mistral-small-2506",
-                        "magistral-small-2506",
-                    ),
-                ),
-                label="Mistral",
-            ),
-            label="Model",
-            searchable=True,
-        ),
-        LabelRange(label="Temperature", value="12"),
-        LabelRange(label="Maximum Length", value="80"),
-        # LabelRange(label='Top P', value='40'),
-        cls="space-y-4",
-    ),
-    header=(H3("Model"), Subtitle("Models parameters")),
-    body_cls="pt-0",
-)
 
 
 def LoginPage(message: str = None):

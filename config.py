@@ -24,3 +24,13 @@ MAX_SESSION_AGE = 7 * 24 * 3600  # days x hours x minutes
 db = database(":memory:")
 sources = db.create(Source, pk="filename")
 discussion = db.create(Message, pk="order")
+
+MODELS = [
+    ("Qwen3-32B", "qwen/qwen3-32b"),
+    ("Llama Guard 4-12B", "meta-llama/llama-guard-4-12b"),
+    ("GPT-OSS 120B", "openai/gpt-oss-120b"),
+    ("GPT-OSS 20B", "openai/gpt-oss-20b"),
+    ("Llama 4 Maverick 17B-128E Instruct", "meta-llama/llama-4-maverick-17b-128e-instruct"),
+    ("Llama 4 Scout 17B-16E Instruct", "meta-llama/llama-4-scout-17b-16e-instruct"),
+    ("Kimi K2 Instruct 0905", "moonshotai/kimi-k2-instruct-0905"),
+]

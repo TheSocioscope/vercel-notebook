@@ -3,6 +3,7 @@ import re
 import markdown
 from fasthtml.common import *
 from monsterui.all import *
+from config import MODELS
 
 
 def parse_thinking(response: str):
@@ -53,7 +54,15 @@ def PromptForm(query: str = ""):
             cls="uk-textarea p-4 bg-[hsl(var(--background))]",
             placeholder="Write any question to LLM...",
         )(query),
-        DivRAligned(Button("Ask", type="submit", cls=(ButtonT.primary)), cls="mt-4"),
+        Div(cls="mt-4 flex items-center justify-end gap-3")(
+            Select(
+                *[Option(name, value=model_id) for name, model_id in MODELS],
+                value="qwen/qwen3-32b",
+                name="model",
+                cls="min-w-48 bg-[hsl(var(--background))]",
+            ),
+            Button("Ask", type="submit", cls=(ButtonT.primary)),
+        )
     )
 
 

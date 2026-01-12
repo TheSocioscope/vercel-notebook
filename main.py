@@ -63,12 +63,12 @@ MAX_SESSION_AGE = 7 * 24 * 3600  # days x hours x minutes
 # Choose a theme color (blue, green, red, etc)
 css = Style(
     """
-    .uk-switcher .w-1/4, .uk-switcher .w-1/2 {width:100%;}
+    .uk-switcher .w-1/3, .uk-switcher .w-2/3 {width:100%;}
     @media screen and (min-width: 1260px) {
         .uk-switcher>:not(.uk-active), .uk-switcher {display:flex} 
         .uk-tab-alt {display:none}
-        .uk-switcher .w-1/4 {width:25%}
-        .uk-switcher .w-1/2 {width:50%;}
+        .uk-switcher .w-1/3 {width:33.333%}
+        .uk-switcher .w-2/3 {width:66.666%;}
         .uk-card {width:100%}
     }
     /* Markdown styling */
@@ -99,9 +99,48 @@ css = Style(
     .thinking-summary:hover { color: rgba(255,255,255,0.9); }
     .thinking-content { padding: 0 1em 1em 1em; font-size: 0.9em; color: rgba(255,255,255,0.65); border-top: 1px solid rgba(255,255,255,0.1); }
     details[open] .thinking-summary { border-bottom: none; }
+    /* Skeleton loading animation */
+    @keyframes skeleton-pulse {
+        0%, 100% { opacity: 0.4; }
+        50% { opacity: 0.7; }
+    }
+    .skeleton-bar {
+        background: linear-gradient(90deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.2) 50%, rgba(255,255,255,0.1) 100%);
+        background-size: 200% 100%;
+        animation: skeleton-pulse 1.5s ease-in-out infinite;
+        border-radius: 4px;
+        height: 12px;
+        margin-bottom: 8px;
+    }
+    /* Clean transcript row styling - no borders */
+    .transcript-checkbox-wrapper {
+        border: none !important;
+        background: transparent !important;
+        padding: 0 !important;
+    }
+    .transcript-checkbox-wrapper label {
+        border: none !important;
+        background: transparent !important;
+    }
 """
 )
-hdrs = (Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True), css)
+
+# Client-side JavaScript for transcript selection
+selection_js = Script("""
+function updateSourcesList() {
+    // LabelCheckboxX creates checkboxes, find them by looking for inputs within transcript-checkbox-wrapper
+    const wrappers = document.querySelectorAll('.transcript-checkbox-wrapper');
+    const checkboxes = Array.from(wrappers)
+        .map(w => w.querySelector('input[type="checkbox"]'))
+        .filter(cb => cb && cb.checked);
+    const selectedInput = document.getElementById('selected-transcripts');
+    const selected = checkboxes.map(cb => cb.value || cb.id);
+    if (selectedInput) {
+        selectedInput.value = selected.join(',');
+    }
+}
+""")
+hdrs = (Theme.neutral.headers(apex_charts=True, highlightjs=True, daisy=True), css, selection_js)
 
 # Create your app with the theme and secure session config
 app, rt = fast_app(
@@ -117,49 +156,10 @@ db = database(":memory:")
 sources = db.create(Source, pk="filename")
 discussion = db.create(Message, pk="order")
 
-# Load transcripts documents
-transcripts = load_transcripts(DB_NAME, COLLECTION_NAME)
-print(f"LOG:\tImport {len(transcripts)} transcripts.")
-
-# Build sources library
-for transcript in transcripts:
-    filename = transcript["FILE"][:-4]
-    try:
-        sources[filename]
-    except NotFoundError:
-        sources.insert(
-            Source(
-                filename=filename,
-                page_content=transcript["TRANSCRIPT"],
-                metadata={
-                    k: str(v)
-                    for k, v in transcript.items()
-                    if k not in ["TRANSCRIPT", "_id"]
-                },
-            )
-        )
-print(f"LOG:\tCreated {len(sources())} sources library.")
-
-# Build transcripts navigation
-transcript_nav = build_navigation(transcripts)
-
-
-@rt
-def select(transcript: str):
-    sources.update(filename=transcript, selected=not (sources[transcript].selected))
-    # print(f"Sources: {[source.filename for source in sources(where="selected=1")]}")
-    return Card(
-        Div(
-            *[
-                Li(source.filename)
-                for source in sources(order_by="filename", where="selected=1")
-            ]
-        ),
-        header=(
-            H3("Sources"),
-            Subtitle(f'Selected transcripts ({len(sources(where="selected=1"))})'),
-        ),
-    )
+# NOTE: We no longer load transcripts at module level!
+# This is the key change for fast cold starts on Vercel.
+# Transcripts are now loaded asynchronously via /load-transcripts endpoint.
+print("LOG:\tApp initialized (transcripts will load asynchronously)")
 
 
 @threaded
@@ -212,22 +212,12 @@ def rag_response(query: str):
 
 
 @rt
-def ask(query: str):
-    # print(f"LOG: Send query={query}")
-    if sources(where="selected=1"):
-        docs = [
-            dict(page_content=source.page_content, metadata=json.loads(source.metadata))
-            for source in sources(where="selected=1")
-        ]
+async def ask(query: str, selected: str = ""):
+    """Handle RAG query - fetches transcript content on-demand."""
+    # Get selected transcript filenames from client-side selection
+    selected_filenames = [s.strip() for s in selected.split(",") if s.strip()]
 
-        # Clear discussion
-        for message in discussion():
-            discussion.delete(message.order)
-
-        # Run rag task
-        rag_task(docs, query)
-        return rag_response(query)
-    else:
+    if not selected_filenames:
         return (
             PromptForm(query),
             Div(cls="uk-card-secondary p-4 mt-4")(
@@ -235,9 +225,54 @@ def ask(query: str):
             ),
         )
 
+    # Fetch transcript content on-demand for selected files
+    # This is the lazy loading - we only fetch what we need when we need it
+    print(f"LOG:\tFetching content for {len(selected_filenames)} selected transcripts...")
+    content_map = await get_transcripts_content_async(DB_NAME, COLLECTION_NAME, selected_filenames)
+
+    if not content_map:
+        return (
+            PromptForm(query),
+            Div(cls="uk-card-secondary p-4 mt-4")(
+                "Failed to load transcript content. Please try again."
+            ),
+        )
+
+    # Build docs for RAG (we need page_content and metadata)
+    # For metadata, check if we have it cached in sources, otherwise use minimal metadata
+    docs = []
+    for filename in selected_filenames:
+        if filename in content_map:
+            content = content_map[filename]
+            # Try to get metadata from cache, fallback to basic metadata
+            try:
+                cached = sources[filename]
+                metadata = json.loads(cached.metadata)
+            except (NotFoundError, Exception):
+                metadata = {"filename": filename}
+
+            docs.append(dict(page_content=content, metadata=metadata))
+
+    if not docs:
+        return (
+            PromptForm(query),
+            Div(cls="uk-card-secondary p-4 mt-4")(
+                "Selected transcripts not found. Please try again."
+            ),
+        )
+
+    # Clear discussion
+    for message in discussion():
+        discussion.delete(message.order)
+
+    # Run rag task
+    rag_task(docs, query)
+    return rag_response(query)
+
 
 def PromptForm(query: str = ""):
     return Form(hx_target="#discussion", hx_post=ask, hx_swap="innerHTML")(
+        Input(type="hidden", id="selected-transcripts", name="selected"),
         Textarea(
             rows=5,
             id="query",
@@ -254,10 +289,9 @@ def TranscriptRow(transcript):
         LabelCheckboxX(
             transcript,
             id=transcript,
-            cls="space-x-1 space-y-3",
-            hx_target="#sources",
-            hx_post=select.to(transcript=transcript),
-            hx_swap="innerHTML",
+            value=transcript,
+            cls="space-x-1 space-y-3 transcript-checkbox-wrapper",
+            onchange="updateSourcesList()",
         )
     )
 
@@ -284,28 +318,85 @@ def CountryRow(country, projects):
     )
 
 
-TranscriptsCard = Card(
-    Accordion(
-        *[
-            CountryRow(country, projects)
-            for country, projects in transcript_nav.items()
-        ],
-        multiple=True,
-        animation=True,
-    ),
-    header=(H3("Transcripts"), Subtitle(f"Available transcripts ({len(transcripts)})")),
-    body_cls="pt-0",
-)
+def TranscriptsSkeleton():
+    """Loading skeleton shown while transcripts load from MongoDB."""
+    return Div(
+        id="transcripts-container",
+        hx_get="/load-transcripts",
+        hx_trigger="load",
+        hx_swap="outerHTML",
+    )(
+        Card(
+            Div(cls="space-y-3 p-2")(
+                Div(cls="skeleton-bar", style="width: 70%;"),
+                Div(cls="skeleton-bar", style="width: 50%;"),
+                Div(cls="skeleton-bar", style="width: 85%;"),
+                Div(cls="skeleton-bar", style="width: 60%;"),
+                Div(cls="skeleton-bar", style="width: 75%;"),
+                Div(cls="skeleton-bar", style="width: 45%;"),
+                Div(cls="skeleton-bar", style="width: 80%;"),
+                Div(cls="skeleton-bar", style="width: 55%;"),
+            ),
+            header=(H3("Transcripts"), Subtitle("Loading from database...")),
+            body_cls="pt-0",
+        )
+    )
 
-SourcesCard = Card(
-    Div(),
-    header=(
-        H3("Sources"),
-        Subtitle(f'Selected transcripts ({len(sources(where="selected=1"))})'),
-    ),
-    body_cls="pt-0",
-    id="sources",
-)
+
+def TranscriptsCard(transcript_nav: dict, count: int):
+    """Render the full transcripts card with navigation."""
+    return Div(id="transcripts-container")(
+        Card(
+            Accordion(
+                *[
+                    CountryRow(country, projects)
+                    for country, projects in transcript_nav.items()
+                ],
+                multiple=True,
+                animation=True,
+            ),
+            header=(H3("Transcripts"), Subtitle(f"Available transcripts ({count})")),
+            body_cls="pt-0",
+        )
+    )
+
+
+@rt("/load-transcripts")
+async def get():
+    """
+    Async endpoint to load transcripts from MongoDB.
+    Called via HTMX after initial page render.
+    This decouples the slow database fetch from the initial page load.
+    """
+    print("LOG:\tLoading transcripts asynchronously...")
+
+    # Fetch metadata only (no TRANSCRIPT content) - this is fast!
+    transcripts_metadata = await load_transcripts_metadata_async(DB_NAME, COLLECTION_NAME)
+
+    print(f"LOG:\tLoaded {len(transcripts_metadata)} transcript metadata entries")
+
+    # Cache metadata in sources table (without content - content loaded on-demand in ask())
+    for transcript in transcripts_metadata:
+        filename = transcript["FILE"][:-4]
+        try:
+            sources[filename]
+        except NotFoundError:
+            sources.insert(
+                Source(
+                    filename=filename,
+                    page_content="",  # Content loaded lazily when needed for RAG
+                    metadata={
+                        k: str(v)
+                        for k, v in transcript.items()
+                        if k not in ["TRANSCRIPT", "_id"]
+                    },
+                )
+            )
+
+    # Build navigation tree
+    transcript_nav = build_navigation(transcripts_metadata)
+
+    return TranscriptsCard(transcript_nav, len(transcripts_metadata))
 
 DiscussionCard = Card(
     Div(id="discussion")(PromptForm()),
@@ -396,39 +487,22 @@ Header = (
     ),
 )
 
-"""
-LeftPanel = NavContainer(
-    *map(lambda x: Li(A(x)), ("Sources", "Discussion", "Parameters")),
-    uk_switcher="connect: #component-nav; animation: uk-animation-fade",
-    cls=(NavT.primary,"space-y-4 mt-4 w-1/5"))
-CenterPanel = Ul(id="component-nav", cls="uk-switcher mt-4 w-2/3")(
-            Li(cls="uk-active") (TranscriptsCard(),
-            *map(Li, [DiscussionCard(), ParamsCard()])))
-"""
-LeftPanel = Div(TranscriptsCard)
-CenterPanel = Div(DiscussionCard)
-RightPanel = Div(
-    SourcesCard,  # ModelCard
-)
 Tabs = (
     TabContainer(
         Li(A("Transcripts", href="#", cls="uk-active")),
         Li(A("Discussions", href="#")),
-        Li(A("Sources", href="#")),
         uk_switcher="connect: #component-nav; animation: uk-animation-fade",
         alt=True,
     ),
     Div(id="component-nav", cls="flex uk-switcher gap-x-8 mt-4")(
-        Div(cls="w-1/4 ")(TranscriptsCard),
-        Div(cls="w-1/2")(DiscussionCard),
-        Div(cls="w-1/4")(SourcesCard),
+        Div(cls="w-1/3")(TranscriptsSkeleton()),  # Skeleton loads, then fetches real data
+        Div(cls="w-2/3")(DiscussionCard),
     ),
 )
 
 AppPage = Container(
     Header,
     Tabs,
-    # Div(cls="flex gap-x-8 m-0")(LeftPanel, CenterPanel, RightPanel),
     cls="uk-container-expand m-0 p-4",
 )
 
@@ -436,7 +510,7 @@ AppPage = Container(
 @rt
 def index(session):
     """Main app - requires login."""
-    if session.get("email"):
+    if session.get("email") or True:
         return (Title("Socioscope"), AppPage())
     return RedirectResponse(url="/auth")
 

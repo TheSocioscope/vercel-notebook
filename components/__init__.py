@@ -26,7 +26,6 @@ from components.discussion import (
 # Layout components
 from components.layout import (
     Header,
-    MainLayout,
     AppPage,
 )
 
@@ -55,7 +54,6 @@ __all__ = [
     "WaitingResponse",
     # Layout
     "Header",
-    "MainLayout",
     "AppPage",
     # Auth
     "LoginPage",

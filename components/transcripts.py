@@ -70,13 +70,14 @@ def TranscriptsSkeleton():
             ),
             header=(H3("Transcripts"), Subtitle("Loading from database...")),
             body_cls="pt-0",
+            cls="rounded-none shadow-none border-none",
         )
     )
 
 
 def TranscriptsCard(transcript_nav: dict, count: int):
     """Render the full transcripts card with navigation."""
-    return Div(id="transcripts-container")(
+    return Div(id="transcripts-container", cls="bg-red-500 h-full")(
         Card(
             Accordion(
                 *[
@@ -87,17 +88,18 @@ def TranscriptsCard(transcript_nav: dict, count: int):
                 animation=True,
             ),
             header=(H3("Transcripts"), Subtitle(f"Available transcripts ({count})")),
-            body_cls="pt-0",
+            body_cls="pt-0 overflow-y-auto flex-1 min-h-0",
+            cls="rounded-none shadow-none border-none h-full flex flex-col",
         )
     )
 
 
-def TranscriptSegmentRow(segment: dict, speaker_index: int):
+def TranscriptSegmentRow(segment: dict):
     """Render a single transcript segment with speaker coloring."""
     return Div(cls="transcript-segment")(
         Div(cls="segment-time")(segment["start_time"]),
         Div(cls="segment-body")(
-            Div(cls="segment-speaker uppercase")(segment["speaker"]),
+            Div(cls="segment-speaker text-xs font-light uppercase text-[hsl(var(--foreground))]")(segment["speaker"]),
             Div(cls="segment-text")(segment["text"])
         )
     )
@@ -142,19 +144,10 @@ def TranscriptViewer(metadata: dict, segments: list, speakers: list, offset: int
     return Div(cls="transcript-viewer")(
         Div(cls="transcript-header")(
             H4(metadata.get("NAME", "Transcript"), cls="mb-2"),
-            Div(cls="transcript-meta")(
-                Div(cls="transcript-meta-item")(
-                    Span("Project: ", cls="transcript-meta-label"),
-                    Span(metadata.get("PROJECT", "-")),
-                ),
-                Div(cls="transcript-meta-item")(
-                    Span("Location: ", cls="transcript-meta-label"),
-                    Span(f"{metadata.get('GEOGRAPHY', '-')}, {metadata.get('COUNTRY', '-')}"),
-                ),
-            )
+            Span(metadata.get("PROJECT", "-"), cls="text-[hsl(var(--muted-foreground))]"),
         ),
         Div(cls="transcript-content")(
-            *[TranscriptSegmentRow(seg, speaker_to_index.get(seg["speaker"], 0)) for seg in chunk],
+            *[TranscriptSegmentRow(seg) for seg in chunk],
             TranscriptLoadMoreSentinel(filename, offset + limit, limit) if (offset + limit) < total else None,
         ),
     )

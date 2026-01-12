@@ -2,6 +2,8 @@ from fasthtml.common import Style
 
 css = Style(
     """
+    html, body { height: 100vh; max-height: 100vh; overflow: hidden; }
+
     /* NOTE:
        Avoid overriding UIkit's `uk-switcher` visibility rules globally.
      */
@@ -87,7 +89,7 @@ css = Style(
 
     /* Transcript viewer styles */
     .transcript-viewer {
-        max-height: 65vh;
+        max-height: 100%;
         overflow-y: auto;
         border-radius: var(--uk-global-radius);
         border: 1px solid hsl(var(--border));
@@ -102,10 +104,6 @@ css = Style(
         border-bottom: 1px solid hsl(var(--border));
         z-index: 10;
         backdrop-filter: blur(8px);
-    }
-    .transcript-meta {
-        display: flex; flex-wrap: wrap; gap: 1rem; font-size: 0.85rem;
-        color: hsl(var(--muted-foreground));
     }
     
     .transcript-segment {
@@ -125,14 +123,10 @@ css = Style(
         padding-top: 0.2rem; text-align: right;
     }
     
-    .segment-speaker {
-        font-weight: 600; font-size: 0.8rem; letter-spacing: 0.02em;
-        color: hsl(var(--foreground));
-    }
-
     .segment-text {
         font-size: 0.875rem; line-height: 1.55;
         color: hsl(var(--foreground));
     }
+
     """
 )

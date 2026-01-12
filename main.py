@@ -95,22 +95,16 @@ def rag_task(docs: list[dict], query: str):
 @rt("/rag-response")
 def rag_response(query: str):
     if discussion():
-        return (
-            PromptForm(query),
-            Div(*[render_response(m.final_response) for m in discussion()]),
-        )
+        return Div(*[render_response(m.final_response) for m in discussion()])
     else:
-        return (
-            Textarea(rows=5, disabled=True, cls="uk-textarea p-4")(query),
-            Div(
-                cls="uk-card-secondary mt-4 p-4",
-                hx_target="#discussion",
-                hx_post=f"/rag-response?query={query}",
-                # Only poll while the Discussion tab is active; reduces hidden-tab work/jank.
-                hx_trigger="every 1s[document.getElementById('discussion-tab')?.closest('li')?.classList.contains('uk-active')]",
-                hx_swap="innerHTML",
-            )("Please wait for the answer..."),
-        )
+        return Div(
+            cls="uk-card-secondary p-4",
+            hx_target="#discussion-results",
+            hx_post=f"/rag-response?query={query}",
+            # Only poll while the Discussion tab is active; reduces hidden-tab work/jank.
+            hx_trigger="every 1s[document.getElementById('discussion-tab')?.closest('li')?.classList.contains('uk-active')]",
+            hx_swap="innerHTML",
+        )("Please wait for the answer...")
 
 
 @rt("/ask")
@@ -120,11 +114,8 @@ async def ask(query: str, selected: str = ""):
     selected_filenames = [s.strip() for s in selected.split(",") if s.strip()]
 
     if not selected_filenames:
-        return (
-            PromptForm(query),
-            Div(cls="uk-card-secondary p-4 mt-4")(
-                "Please select at least one source in the transcripts panel."
-            ),
+        return Div(cls="uk-card-secondary")(
+            "Please select at least one source in the transcripts panel."
         )
 
     # Fetch transcript content on-demand for selected files
@@ -133,11 +124,8 @@ async def ask(query: str, selected: str = ""):
     content_map = await get_transcripts_content_async(DB_NAME, COLLECTION_NAME, selected_filenames)
 
     if not content_map:
-        return (
-            PromptForm(query),
-            Div(cls="uk-card-secondary p-4 mt-4")(
-                "Failed to load transcript content. Please try again."
-            ),
+        return Div(cls="uk-card-secondary")(
+            "Failed to load transcript content. Please try again."
         )
 
     # Build docs for RAG (we need page_content and metadata)
@@ -156,11 +144,8 @@ async def ask(query: str, selected: str = ""):
             docs.append(dict(page_content=content, metadata=metadata))
 
     if not docs:
-        return (
-            PromptForm(query),
-            Div(cls="uk-card-secondary p-4 mt-4")(
-                "Selected transcripts not found. Please try again."
-            ),
+        return Div(cls="uk-card-secondary")(
+            "Selected transcripts not found. Please try again."
         )
 
     # Clear discussion
@@ -254,10 +239,8 @@ async def read_transcript_chunk(filename: str, offset: int = 200, limit: int = 2
     total = len(segments)
     chunk = segments[offset: offset + limit]
 
-    speaker_to_index = {s: i for i, s in enumerate(speakers)}
-
     return Div(
-        *[TranscriptSegmentRow(seg, speaker_to_index.get(seg["speaker"], 0)) for seg in chunk],
+        *[TranscriptSegmentRow(seg) for seg in chunk],
         TranscriptLoadMoreSentinel(filename, offset + limit, limit) if (offset + limit) < total else None,
     )
 

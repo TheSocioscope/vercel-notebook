@@ -57,24 +57,23 @@ def PromptForm(query: str = ""):
 
 
 def RightPanelCard():
-    """Right panel with tabbed Discussion/Reading inside a single Card."""
-    return Card(
-        # Tab navigation
-        # Note: disable tab animation to avoid painting both panels during transitions,
-        # which becomes noticeably janky when the Reading tab contains a large transcript DOM.
-        Ul(cls="uk-tab", **{"data-uk-tab": "connect: #right-content"})(
-            Li(cls="uk-active")(A("Discussion", href="#", id="discussion-tab")),
-            Li()(A("Reading", href="#", id="reading-tab")),
+    """Right panel with tabbed Discussion/Reading."""
+    return Div(cls="right-panel-container")(
+        # Tab navigation - full width tabs
+        Ul(cls="uk-tab", style="border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 0;",
+           **{"data-uk-tab": "connect: #right-content"})(
+            Li(cls="uk-active flex-1 text-center")(A("Discussion", href="#", id="discussion-tab")),
+            Li(cls="flex-1 text-center")(A("Reading", href="#", id="reading-tab")),
         ),
         # Tab content
-        Ul(id="right-content", cls="uk-switcher uk-margin")(
+        Ul(id="right-content", cls="uk-switcher")(
             # Discussion tab content
             Li(cls="uk-active")(
-                Div(id="discussion")(PromptForm()),
+                Div(id="discussion", cls="pt-4")(PromptForm()),
             ),
             # Reading tab content
             Li()(
-                Div(id="reading-panel", cls="min-h-[350px]")(
+                Div(id="reading-panel", cls="min-h-[350px] pt-4")(
                     Div(cls="p-8 text-center")(
                         P("📖", cls="text-4xl mb-4 opacity-30"),
                         P("Select a transcript to read", cls="opacity-50"),
@@ -83,8 +82,6 @@ def RightPanelCard():
                 )
             ),
         ),
-        header=(H3("Workspace"), Subtitle("Discussion & transcript reading")),
-        body_cls="pt-0",
     )
 
 

@@ -5,7 +5,7 @@ from monsterui.all import *
 
 def TranscriptRow(transcript: str):
     """Single transcript row with checkbox and read button."""
-    return Div(cls="transcript-row")(
+    return Div(cls="flex items-center")(
         LabelCheckboxX(
             transcript,
             id=transcript,
@@ -15,7 +15,7 @@ def TranscriptRow(transcript: str):
         ),
         Span(
             "📖",
-            cls="view-btn",
+            cls="cursor-pointer",
             hx_get=f"/read-transcript?filename={transcript}",
             hx_target="#reading-panel",
             hx_swap="innerHTML",
@@ -97,7 +97,7 @@ def TranscriptSegmentRow(segment: dict, speaker_index: int):
     return Div(cls="transcript-segment")(
         Div(cls="segment-time")(segment["start_time"]),
         Div(cls="segment-body")(
-            Div(cls=f"segment-speaker speaker-{speaker_index % 8}")(segment["speaker"]),
+            Div(cls="segment-speaker uppercase")(segment["speaker"]),
             Div(cls="segment-text")(segment["text"])
         )
     )
@@ -144,36 +144,14 @@ def TranscriptViewer(metadata: dict, segments: list, speakers: list, offset: int
             H4(metadata.get("NAME", "Transcript"), cls="mb-2"),
             Div(cls="transcript-meta")(
                 Div(cls="transcript-meta-item")(
-                    Span("Project:", cls="transcript-meta-label"),
+                    Span("Project: ", cls="transcript-meta-label"),
                     Span(metadata.get("PROJECT", "-")),
                 ),
                 Div(cls="transcript-meta-item")(
-                    Span("Location:", cls="transcript-meta-label"),
+                    Span("Location: ", cls="transcript-meta-label"),
                     Span(f"{metadata.get('GEOGRAPHY', '-')}, {metadata.get('COUNTRY', '-')}"),
                 ),
-                Div(cls="transcript-meta-item")(
-                    Span("Date:", cls="transcript-meta-label"),
-                    Span(f"{metadata.get('MONTH', '-')} {metadata.get('YEAR', '-')}"),
-                ),
-                Div(cls="transcript-meta-item")(
-                    Span("Type:", cls="transcript-meta-label"),
-                    Span(metadata.get("TYPE", "-")),
-                ),
-            ),
-            Div(cls="transcript-legend")(
-                *[
-                    Div(cls="legend-item")(
-                        Div(
-                            cls="legend-dot",
-                            style=f"background: {SPEAKER_COLORS[i % 8]}",
-                        ),
-                        Span(speaker, cls=f"speaker-{i % 8}"),
-                    )
-                    for i, speaker in enumerate(speakers)
-                ]
             )
-            if len(speakers) > 1
-            else None,
         ),
         Div(cls="transcript-content")(
             *[TranscriptSegmentRow(seg, speaker_to_index.get(seg["speaker"], 0)) for seg in chunk],

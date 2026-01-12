@@ -309,13 +309,6 @@ def post(req: MagicLinkRequest, request):
     return (Title("Socioscope"), LoginPage(message=f"✅ Magic link sent! Check your email."))
 
 
-@rt
-def logout(session):
-    """Clear session and redirect to login."""
-    session.clear()
-    return RedirectResponse(url="/auth")
-
-
 # For local development
 if __name__ == "__main__":
     serve()

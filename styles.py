@@ -72,6 +72,23 @@ css = Style(
         border-top: 1px solid hsl(var(--border)); 
     }
 
+    /* HTMX loading indicator */
+    .htmx-indicator {
+        display: none !important;
+    }
+    .htmx-indicator.htmx-request {
+        display: flex !important;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem 0;
+        gap: 1rem;
+    }
+    form.htmx-request [type="submit"] {
+        opacity: 0.6;
+        pointer-events: none;
+    }
+
     /* Skeleton loading animation */
     @keyframes skeleton-pulse {
         0%, 100% { opacity: 0.4; }

@@ -4,7 +4,7 @@ from fastlite import *
 from fasthtml.svg import *
 from fasthtml.common import *
 from monsterui.all import *
-from lib.discussion import *
+from lib.discussion import send_rag
 from lib.sources import *
 from lib.transcript_service import get_parsed_transcript
 from lib.auth import generate_magic_link, verify_token, is_email_allowed, MagicLinkRequest
@@ -31,7 +31,6 @@ from config import (
     COLLECTION_NAME,
     MAX_SESSION_AGE,
     sources,
-    discussion,
 )
 
 # Client-side JavaScript for transcript selection
@@ -63,73 +62,27 @@ app, rt = fast_app(
 )
 
 
-@threaded
-def rag_task(docs: list[dict], query: str):
-    print(f'LOG: Send "{query}" for RAG on {len(docs)} documents...')
-    try:
-        response = send_rag(docs=docs, message=query)
-    except:
-        discussion.insert(
-            Message(
-                order=len(discussion()) + 1,
-                model="qwen/qwen3-32b",
-                question=query,
-                contents=docs,
-                responses=[],
-                final_response="Sorry error in the request, please try again.",
-            )
-        )
-    else:
-        discussion.insert(
-            Message(
-                order=len(discussion()) + 1,
-                model="qwen/qwen3-32b",
-                question=response["question"],
-                contents=response["contents"],
-                responses=response["responses"],
-                final_response=response["final_response"],
-            )
-        )
-
-
-@rt("/rag-response")
-def rag_response(query: str):
-    if discussion():
-        return Div(*[render_response(m.final_response) for m in discussion()])
-    else:
-        return Div(
-            cls="uk-card-secondary p-4",
-            hx_target="#discussion-results",
-            hx_post=f"/rag-response?query={query}",
-            # Only poll while the Discussion tab is active; reduces hidden-tab work/jank.
-            hx_trigger="every 1s[document.getElementById('discussion-tab')?.closest('li')?.classList.contains('uk-active')]",
-            hx_swap="innerHTML",
-        )("Please wait for the answer...")
-
-
 @rt("/ask")
 async def ask(query: str, selected: str = ""):
-    """Handle RAG query - fetches transcript content on-demand."""
+    """Handle RAG query - synchronous, serverless-friendly."""
     # Get selected transcript filenames from client-side selection
     selected_filenames = [s.strip() for s in selected.split(",") if s.strip()]
 
     if not selected_filenames:
-        return Div(cls="uk-card-secondary")(
+        return Div(cls="uk-card-secondary p-4")(
             "Please select at least one source in the transcripts panel."
         )
 
     # Fetch transcript content on-demand for selected files
-    # This is the lazy loading - we only fetch what we need when we need it
     print(f"LOG:\tFetching content for {len(selected_filenames)} selected transcripts...")
     content_map = await get_transcripts_content_async(DB_NAME, COLLECTION_NAME, selected_filenames)
 
     if not content_map:
-        return Div(cls="uk-card-secondary")(
+        return Div(cls="uk-card-secondary p-4")(
             "Failed to load transcript content. Please try again."
         )
 
     # Build docs for RAG (we need page_content and metadata)
-    # For metadata, check if we have it cached in sources, otherwise use minimal metadata
     docs = []
     for filename in selected_filenames:
         if filename in content_map:
@@ -144,17 +97,20 @@ async def ask(query: str, selected: str = ""):
             docs.append(dict(page_content=content, metadata=metadata))
 
     if not docs:
-        return Div(cls="uk-card-secondary")(
+        return Div(cls="uk-card-secondary p-4")(
             "Selected transcripts not found. Please try again."
         )
 
-    # Clear discussion
-    for message in discussion():
-        discussion.delete(message.order)
-
-    # Run rag task
-    rag_task(docs, query)
-    return rag_response(query)
+    # Call RAG synchronously - wait for response (serverless-friendly)
+    print(f'LOG:\tSending "{query[:50]}..." for RAG on {len(docs)} documents...')
+    try:
+        response = send_rag(docs=docs, message=query)
+        return render_response(response["final_response"])
+    except Exception as e:
+        print(f"LOG:\tRAG error: {e}")
+        return Div(cls="uk-card-secondary p-4")(
+            "Sorry, there was an error processing your request. Please try again."
+        )
 
 
 @rt("/load-transcripts")

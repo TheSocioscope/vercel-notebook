@@ -5,7 +5,6 @@ import os
 from dotenv import load_dotenv
 from fastlite import database
 from lib.sources import Source
-from lib.discussion import Message
 
 load_dotenv()
 
@@ -20,10 +19,9 @@ DB_NAME = "socioscope_db"
 COLLECTION_NAME = "socioscope_documents"
 MAX_SESSION_AGE = 7 * 24 * 3600  # days x hours x minutes
 
-# Initialize in-memory database
+# Initialize in-memory database (for transcript metadata caching only)
 db = database(":memory:")
 sources = db.create(Source, pk="filename")
-discussion = db.create(Message, pk="order")
 
 MODELS = [
     ("Qwen3-32B", "qwen/qwen3-32b"),

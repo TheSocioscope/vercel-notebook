@@ -9,6 +9,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 class Message:
     order: int
+    session_id: str  # User session isolation - prevents cross-user result mixing
     model: str
     question: str
     contents: list

@@ -44,7 +44,12 @@ def render_response(response: str):
 
 def PromptForm(query: str = ""):
     """Form for submitting RAG queries."""
-    return Form(hx_target="#discussion-results", hx_post="/ask", hx_swap="innerHTML")(
+    return Form(
+        hx_target="#discussion-results",
+        hx_post="/ask",
+        hx_swap="innerHTML",
+        hx_indicator="#loading-indicator",
+    )(
         Input(type="hidden", id="selected-transcripts", name="selected"),
         Textarea(
             rows=5,
@@ -66,6 +71,22 @@ def PromptForm(query: str = ""):
     )
 
 
+def LoadingIndicator():
+    """Loading indicator shown while RAG query is processing."""
+    return Div(
+        id="loading-indicator",
+        cls="htmx-indicator",
+    )(
+        # Spinner
+        Div(cls="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent"),
+        # Text
+        Div(cls="text-center")(
+            P("Processing your question...", cls="text-sm opacity-70"),
+            P("This may take a moment for multiple documents", cls="text-xs opacity-50 mt-1"),
+        ),
+    )
+
+
 def RightPanelCard():
     """Right panel with tabbed Discussion/Reading."""
     return Div(cls="right-panel-container bg-[hsl(var(--muted))] h-full flex flex-col")(
@@ -82,6 +103,8 @@ def RightPanelCard():
                 Div(id="discussion", cls="h-full flex flex-col p-4")(
                     # Fixed form area at top
                     Div(cls="flex-shrink-0")(PromptForm()),
+                    # Loading indicator (hidden by default, shown during request)
+                    LoadingIndicator(),
                     # Scrollable results area below with subtle divider
                     Div(
                         id="discussion-results",

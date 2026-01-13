@@ -1,11 +1,9 @@
 import os
-import json
-from fastlite import *
 from fasthtml.svg import *
 from fasthtml.common import *
 from monsterui.all import *
 from lib.discussion import map_document, reduce_responses
-from lib.sources import *
+from lib.sources import load_transcripts_metadata_async, get_transcripts_content_async, build_navigation
 from lib.transcript_service import get_parsed_transcript
 from lib.auth import generate_magic_link, verify_token, is_email_allowed, MagicLinkRequest
 from styles import css
@@ -23,14 +21,13 @@ from components import (
     AppPage,
 )
 
-# Import configuration and database from config.py
+# Import configuration
 from config import (
     SESSION_SECRET,
     IS_PRODUCTION,
     DB_NAME,
     COLLECTION_NAME,
     MAX_SESSION_AGE,
-    sources,
 )
 
 # Client-side JavaScript for transcript selection and RAG orchestration
@@ -209,7 +206,7 @@ async def load_transcripts_route():
     """
     Async endpoint to load transcripts from MongoDB.
     Called via HTMX after initial page render.
-    This decouples the slow database fetch from the initial page load.
+    Fetches metadata only (no content) for fast loading.
     """
     print("LOG:\tLoading transcripts asynchronously...")
 
@@ -218,25 +215,7 @@ async def load_transcripts_route():
 
     print(f"LOG:\tLoaded {len(transcripts_metadata)} transcript metadata entries")
 
-    # Cache metadata in sources table (without content - content loaded on-demand in ask())
-    for transcript in transcripts_metadata:
-        filename = transcript["FILE"][:-4]
-        try:
-            sources[filename]
-        except NotFoundError:
-            sources.insert(
-                Source(
-                    filename=filename,
-                    page_content="",  # Content loaded lazily when needed for RAG
-                    metadata={
-                        k: str(v)
-                        for k, v in transcript.items()
-                        if k not in ["TRANSCRIPT", "_id"]
-                    },
-                )
-            )
-
-    # Build navigation tree
+    # Build navigation tree directly (no caching - serverless-friendly)
     transcript_nav = build_navigation(transcripts_metadata)
 
     return TranscriptsCard(transcript_nav, len(transcripts_metadata))

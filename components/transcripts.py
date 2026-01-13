@@ -106,15 +106,30 @@ def TranscriptSegmentRow(segment: dict):
     )
 
 
+def TranscriptSegmentSkeleton():
+    """Single skeleton row mimicking a transcript segment layout."""
+    return Div(cls="transcript-segment")(
+        Div(cls="segment-time")(
+            Div(cls="skeleton-bar", style="width: 100%; height: 10px;")
+        ),
+        Div(cls="segment-body")(
+            Div(cls="skeleton-bar", style="width: 25%; height: 8px; margin-bottom: 6px;"),
+            Div(cls="skeleton-bar", style="width: 95%; height: 10px;"),
+            Div(cls="skeleton-bar", style="width: 80%; height: 10px;"),
+        )
+    )
+
+
 def TranscriptLoadingSkeleton(title: str = "Loading transcript..."):
-    """Generic loading skeleton for transcript content."""
-    return Div(cls="space-y-3 p-2")(
-        H4(title, cls="mb-3"),
-        Div(cls="skeleton-bar", style="width: 70%;"),
-        Div(cls="skeleton-bar", style="width: 90%;"),
-        Div(cls="skeleton-bar", style="width: 80%;"),
-        Div(cls="skeleton-bar", style="width: 60%;"),
-        Div(cls="skeleton-bar", style="width: 85%;"),
+    """Loading skeleton matching the transcript viewer layout."""
+    return Div(cls="transcript-viewer")(
+        Div(cls="transcript-header")(
+            Div(cls="skeleton-bar", style="width: 40%; height: 18px; margin-bottom: 8px;"),
+            Div(cls="skeleton-bar", style="width: 25%; height: 12px;"),
+        ),
+        Div(cls="transcript-content p-2")(
+            *[TranscriptSegmentSkeleton() for _ in range(8)],
+        ),
     )
 
 
@@ -125,8 +140,11 @@ def TranscriptLoadMoreSentinel(filename: str, offset: int, limit: int):
         hx_get=f"/read-transcript-chunk?filename={filename}&offset={offset}&limit={limit}",
         hx_trigger="revealed",
         hx_swap="outerHTML",
-        cls="p-4",
-    )(TranscriptLoadingSkeleton("Loading more..."))
+    )(
+        TranscriptSegmentSkeleton(),
+        TranscriptSegmentSkeleton(),
+        TranscriptSegmentSkeleton(),
+    )
 
 
 # Speaker colors for transcript legend

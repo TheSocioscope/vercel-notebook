@@ -1,6 +1,5 @@
-import json
 from lib.sources import get_transcripts_content_async, parse_transcript, get_unique_speakers
-from config import DB_NAME, COLLECTION_NAME, sources
+from config import DB_NAME, COLLECTION_NAME
 
 
 # Transcript content cache (LRU-style)
@@ -52,13 +51,7 @@ async def get_parsed_transcript(filename: str):
         return None
 
     transcript_text = contents[filename]
-
-    # metadata from sources cache (best-effort)
-    try:
-        source = sources[filename]
-        metadata = json.loads(source.metadata) if isinstance(source.metadata, str) else source.metadata
-    except Exception:
-        metadata = {"NAME": filename}
+    metadata = {"NAME": filename}
 
     segments = parse_transcript(transcript_text)
     speakers = get_unique_speakers(segments)

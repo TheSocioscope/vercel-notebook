@@ -5,13 +5,6 @@ from pymongo import MongoClient
 from pymongo.server_api import ServerApi
 from motor.motor_asyncio import AsyncIOMotorClient
 
-
-class Source:
-    filename: str
-    page_content: str
-    metadata: dict
-
-
 # Reusable async MongoDB client (connection pooling handled by Motor)
 _motor_client = None
 

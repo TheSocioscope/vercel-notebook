@@ -19,8 +19,8 @@ from components.discussion import (
     parse_thinking,
     render_response,
     PromptForm,
+    ProgressIndicator,
     RightPanelCard,
-    WaitingResponse,
 )
 
 # Layout components
@@ -50,8 +50,8 @@ __all__ = [
     "parse_thinking",
     "render_response",
     "PromptForm",
+    "ProgressIndicator",
     "RightPanelCard",
-    "WaitingResponse",
     # Layout
     "Header",
     "AppPage",

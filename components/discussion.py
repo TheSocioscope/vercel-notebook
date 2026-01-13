@@ -43,13 +43,8 @@ def render_response(response: str):
 
 
 def PromptForm(query: str = ""):
-    """Form for submitting RAG queries."""
-    return Form(
-        hx_target="#discussion-results",
-        hx_post="/ask",
-        hx_swap="innerHTML",
-        hx_indicator="#loading-indicator",
-    )(
+    """Form for submitting RAG queries with client-side orchestration."""
+    return Form(onsubmit="executeRAG(event)")(
         Input(type="hidden", id="selected-transcripts", name="selected"),
         Textarea(
             rows=5,
@@ -71,19 +66,14 @@ def PromptForm(query: str = ""):
     )
 
 
-def LoadingIndicator():
-    """Loading indicator shown while RAG query is processing."""
+def ProgressIndicator():
+    """Progress indicator for RAG processing - managed by JavaScript."""
     return Div(
-        id="loading-indicator",
-        cls="htmx-indicator",
+        id="rag-progress",
+        cls="flex-col items-center justify-center py-8 gap-4",
+        style="display: none;",  # Hidden by default, JS controls visibility
     )(
-        # Spinner
-        Div(cls="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent"),
-        # Text
-        Div(cls="text-center")(
-            P("Processing your question...", cls="text-sm opacity-70"),
-            P("This may take a moment for multiple documents", cls="text-xs opacity-50 mt-1"),
-        ),
+        # Content populated dynamically by executeRAG()
     )
 
 
@@ -103,8 +93,8 @@ def RightPanelCard():
                 Div(id="discussion", cls="h-full flex flex-col p-4")(
                     # Fixed form area at top
                     Div(cls="flex-shrink-0")(PromptForm()),
-                    # Loading indicator (hidden by default, shown during request)
-                    LoadingIndicator(),
+                    # Progress indicator (hidden by default, JS controls visibility)
+                    ProgressIndicator(),
                     # Scrollable results area below with subtle divider
                     Div(
                         id="discussion-results",

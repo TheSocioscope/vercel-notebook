@@ -31,7 +31,7 @@ Take these and distill it into a final, consolidated response to the main user q
 {question}"""
 
 
-def _map_document(question: str, content: str, model: str) -> str:
+def map_document(question: str, content: str, model: str = "qwen/qwen3-32b") -> str:
     """Process a single document and generate a response."""
     response = client.chat.completions.create(
         model=model,
@@ -48,7 +48,7 @@ def _map_document(question: str, content: str, model: str) -> str:
     return response.choices[0].message.content
 
 
-def _reduce_responses(question: str, responses: list[str], model: str) -> str:
+def reduce_responses(question: str, responses: list[str], model: str = "qwen/qwen3-32b") -> str:
     """Consolidate multiple responses into a final answer."""
     responses_text = "\n\n---\n\n".join(
         [f"Response {i+1}:\n{r}" for i, r in enumerate(responses)]
@@ -73,28 +73,20 @@ def _reduce_responses(question: str, responses: list[str], model: str) -> str:
 def send_rag(docs, message, model="qwen/qwen3-32b"):
     """
     Process documents using map-reduce pattern with Groq API.
-
-    Args:
-        docs: List of documents with 'page_content' key
-        message: The user's question
-        model: The Groq model to use
-
-    Returns:
-        dict with question, contents, responses, and final_response
+    Note: This is the legacy synchronous version. For better serverless performance,
+    use map_document + reduce_responses with client-side orchestration.
     """
-    # Map phase: process each document
     responses = []
     contents = [doc["page_content"] for doc in docs]
 
     for content in contents:
-        response = _map_document(message, content, model)
+        response = map_document(message, content, model)
         responses.append(response)
 
-    # Reduce phase: consolidate responses
     if len(responses) == 1:
         final_response = responses[0]
     else:
-        final_response = _reduce_responses(message, responses, model)
+        final_response = reduce_responses(message, responses, model)
 
     return {
         "question": message,

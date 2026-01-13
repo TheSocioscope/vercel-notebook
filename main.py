@@ -4,7 +4,7 @@ from fastlite import *
 from fasthtml.svg import *
 from fasthtml.common import *
 from monsterui.all import *
-from lib.discussion import send_rag
+from lib.discussion import map_document, reduce_responses
 from lib.sources import *
 from lib.transcript_service import get_parsed_transcript
 from lib.auth import generate_magic_link, verify_token, is_email_allowed, MagicLinkRequest
@@ -33,10 +33,9 @@ from config import (
     sources,
 )
 
-# Client-side JavaScript for transcript selection
+# Client-side JavaScript for transcript selection and RAG orchestration
 selection_js = Script("""
 function updateSourcesList() {
-    // LabelCheckboxX creates checkboxes, find them by looking for inputs within transcript-checkbox-wrapper
     const wrappers = document.querySelectorAll('.transcript-checkbox-wrapper');
     const checkboxes = Array.from(wrappers)
         .map(w => w.querySelector('input[type="checkbox"]'))
@@ -45,6 +44,95 @@ function updateSourcesList() {
     const selected = checkboxes.map(cb => cb.value || cb.id);
     if (selectedInput) {
         selectedInput.value = selected.join(',');
+    }
+}
+
+// Client-side RAG orchestration - parallel map, then reduce
+async function executeRAG(event) {
+    event.preventDefault();
+    
+    const form = event.target;
+    const query = form.querySelector('#query').value;
+    const selected = form.querySelector('#selected-transcripts').value;
+    const resultsDiv = document.getElementById('discussion-results');
+    const progressDiv = document.getElementById('rag-progress');
+    
+    if (!selected) {
+        resultsDiv.innerHTML = '<div class="uk-card-secondary p-4">Please select at least one source in the transcripts panel.</div>';
+        return;
+    }
+    
+    const filenames = selected.split(',').filter(s => s.trim());
+    const total = filenames.length;
+    
+    // Show progress UI
+    progressDiv.style.display = 'flex';
+    progressDiv.innerHTML = `
+        <div class="animate-spin rounded-full h-10 w-10 border-4 border-primary border-t-transparent"></div>
+        <div class="text-center">
+            <p class="text-sm opacity-70">Processing documents...</p>
+            <p class="text-xs opacity-50 mt-1" id="progress-text">0 / ${total} documents</p>
+            <div class="w-48 h-2 bg-muted rounded-full mt-2 overflow-hidden">
+                <div id="progress-bar" class="h-full bg-primary transition-all duration-300" style="width: 0%"></div>
+            </div>
+        </div>
+    `;
+    resultsDiv.innerHTML = '';
+    
+    try {
+        // Phase 1: Map - process all documents in parallel
+        let completed = 0;
+        const mapPromises = filenames.map(async (filename) => {
+            const response = await fetch('/map', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: new URLSearchParams({ query, filename })
+            });
+            const result = await response.json();
+            completed++;
+            document.getElementById('progress-text').textContent = `${completed} / ${total} documents`;
+            document.getElementById('progress-bar').style.width = `${(completed / total) * 80}%`;
+            return result;
+        });
+        
+        const mapResults = await Promise.all(mapPromises);
+        
+        // Check for errors
+        const errors = mapResults.filter(r => r.error);
+        if (errors.length === mapResults.length) {
+            throw new Error('All document processing failed');
+        }
+        
+        const responses = mapResults.filter(r => !r.error).map(r => r.response);
+        
+        // Phase 2: Reduce - consolidate responses
+        document.getElementById('progress-text').textContent = 'Consolidating responses...';
+        document.getElementById('progress-bar').style.width = '90%';
+        
+        const reduceResponse = await fetch('/reduce', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'HX-Request': 'true'  // Tell FastHTML to return fragment only
+            },
+            body: JSON.stringify({ query, responses })
+        });
+        
+        const finalResult = await reduceResponse.text();
+        
+        // Done - show results
+        document.getElementById('progress-bar').style.width = '100%';
+        progressDiv.style.display = 'none';
+        resultsDiv.innerHTML = finalResult;
+        
+        // Re-initialize UIkit components only in the new content, not the whole page
+        if (window.UIkit) {
+            UIkit.update(resultsDiv);
+        }
+        
+    } catch (error) {
+        progressDiv.style.display = 'none';
+        resultsDiv.innerHTML = `<div class="uk-card-secondary p-4">Error: ${error.message}. Please try again.</div>`;
     }
 }
 """)
@@ -62,54 +150,57 @@ app, rt = fast_app(
 )
 
 
-@rt("/ask")
-async def ask(query: str, selected: str = ""):
-    """Handle RAG query - synchronous, serverless-friendly."""
-    # Get selected transcript filenames from client-side selection
-    selected_filenames = [s.strip() for s in selected.split(",") if s.strip()]
+@rt("/map")
+async def map_endpoint(query: str, filename: str):
+    """Process a single document - called in parallel by client."""
+    print(f"LOG:\t/map - Processing {filename}...")
 
-    if not selected_filenames:
-        return Div(cls="uk-card-secondary p-4")(
-            "Please select at least one source in the transcripts panel."
-        )
-
-    # Fetch transcript content on-demand for selected files
-    print(f"LOG:\tFetching content for {len(selected_filenames)} selected transcripts...")
-    content_map = await get_transcripts_content_async(DB_NAME, COLLECTION_NAME, selected_filenames)
-
-    if not content_map:
-        return Div(cls="uk-card-secondary p-4")(
-            "Failed to load transcript content. Please try again."
-        )
-
-    # Build docs for RAG (we need page_content and metadata)
-    docs = []
-    for filename in selected_filenames:
-        if filename in content_map:
-            content = content_map[filename]
-            # Try to get metadata from cache, fallback to basic metadata
-            try:
-                cached = sources[filename]
-                metadata = json.loads(cached.metadata)
-            except (NotFoundError, Exception):
-                metadata = {"filename": filename}
-
-            docs.append(dict(page_content=content, metadata=metadata))
-
-    if not docs:
-        return Div(cls="uk-card-secondary p-4")(
-            "Selected transcripts not found. Please try again."
-        )
-
-    # Call RAG synchronously - wait for response (serverless-friendly)
-    print(f'LOG:\tSending "{query[:50]}..." for RAG on {len(docs)} documents...')
     try:
-        response = send_rag(docs=docs, message=query)
-        return render_response(response["final_response"])
+        # Fetch single transcript content
+        content_map = await get_transcripts_content_async(DB_NAME, COLLECTION_NAME, [filename])
+
+        if not content_map or filename not in content_map:
+            return {"error": f"Transcript {filename} not found"}
+
+        content = content_map[filename]
+
+        # Single LLM call - fast, well within timeout
+        response = map_document(query, content)
+        print(f"LOG:\t/map - Completed {filename}")
+
+        return {"filename": filename, "response": response}
+
     except Exception as e:
-        print(f"LOG:\tRAG error: {e}")
+        print(f"LOG:\t/map error for {filename}: {e}")
+        return {"error": str(e), "filename": filename}
+
+
+@rt("/reduce")
+async def reduce_endpoint(request):
+    """Consolidate multiple map responses into final answer."""
+    body = await request.json()
+    query = body.get("query", "")
+    responses = body.get("responses", [])
+
+    print(f"LOG:\t/reduce - Consolidating {len(responses)} responses...")
+
+    if not responses:
+        return Div(cls="uk-card-secondary p-4")("No responses to consolidate.")
+
+    try:
+        # Single response - no reduce needed
+        if len(responses) == 1:
+            final = responses[0]
+        else:
+            final = reduce_responses(query, responses)
+
+        print("LOG:\t/reduce - Complete")
+        return render_response(final)
+
+    except Exception as e:
+        print(f"LOG:\t/reduce error: {e}")
         return Div(cls="uk-card-secondary p-4")(
-            "Sorry, there was an error processing your request. Please try again."
+            "Error consolidating responses. Please try again."
         )
 
 

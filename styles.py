@@ -67,26 +67,25 @@ css = Style(
     .thinking-summary:hover { color: hsl(var(--foreground)); }
     
     .thinking-content { 
-        padding: 0 1em 1em 1em; font-size: 0.9em; 
+        padding: 0.75em 1em 0 1em;
+        font-size: 0.9em; 
         color: hsl(var(--muted-foreground)); 
         border-top: 1px solid hsl(var(--border)); 
     }
 
-    /* HTMX loading indicator */
-    .htmx-indicator {
-        display: none !important;
-    }
-    .htmx-indicator.htmx-request {
-        display: flex !important;
+    /* Progress indicator styles */
+    #rag-progress {
         flex-direction: column;
         align-items: center;
         justify-content: center;
         padding: 2rem 0;
         gap: 1rem;
     }
-    form.htmx-request [type="submit"] {
-        opacity: 0.6;
-        pointer-events: none;
+    .bg-muted {
+        background: hsl(var(--muted));
+    }
+    .bg-primary {
+        background: hsl(var(--primary));
     }
 
     /* Skeleton loading animation */

@@ -78,7 +78,7 @@ def TranscriptsSkeleton():
 
 def TranscriptsCard(transcript_nav: dict, count: int):
     """Render the full transcripts card with navigation."""
-    return Div(id="transcripts-container", cls="h-full border-r border-[hsl(var(--border))]")(
+    return Div(id="transcripts-container", cls="h-full overflow-hidden border-r border-[hsl(var(--border))]")(
         Card(
             Accordion(
                 *[
@@ -90,7 +90,7 @@ def TranscriptsCard(transcript_nav: dict, count: int):
             ),
             header=(H3("Transcripts"), Subtitle(f"Available transcripts ({count})")),
             body_cls="pt-0 overflow-y-auto flex-1 min-h-0",
-            cls="rounded-none shadow-none border-none",
+            cls="rounded-none h-full flex flex-col shadow-none border-none",
         )
     )
 

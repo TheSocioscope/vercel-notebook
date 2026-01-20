@@ -78,13 +78,14 @@ def ProgressIndicator():
 
 
 def RightPanelCard():
-    """Right panel with tabbed Discussion/Reading."""
+    """Right panel with tabbed Discussion/Reading/History."""
     return Div(cls="right-panel-container bg-[hsl(var(--muted))] h-full flex flex-col")(
         # Tab navigation - full width tabs
         Ul(cls="uk-tab", style="border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 0;",
            **{"data-uk-tab": "connect: #right-content"})(
             Li(cls="uk-active flex-1 text-center")(A("Discussion", href="#", id="discussion-tab")),
             Li(cls="flex-1 text-center")(A("Reading", href="#", id="reading-tab")),
+            Li(cls="flex-1 text-center")(A("History", href="#", id="history-tab")),
         ),
         # Tab content
         Ul(id="right-content", cls="uk-switcher flex-1 overflow-hidden h-full")(
@@ -111,6 +112,14 @@ def RightPanelCard():
                         P("Click the 📖 icon next to any transcript", cls="text-sm opacity-30 mt-2")
                     )
                 )
+            ),
+            # History tab content
+            Li(cls="h-full overflow-hidden flex flex-col")(
+                Div(cls="p-3 border-b border-[hsl(var(--border))] flex justify-between items-center flex-shrink-0")(
+                    P("Past Chats", cls="font-medium text-sm"),
+                    Button("Clear", cls="text-xs opacity-50 hover:opacity-100", onclick="clearHistory()"),
+                ),
+                Div(id="history-list", cls="flex-1 overflow-y-auto")(),
             ),
         ),
     )

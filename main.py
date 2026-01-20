@@ -44,6 +44,64 @@ function updateSourcesList() {
     }
 }
 
+// Chat history management
+const HISTORY_KEY = 'socioscope_chat_history';
+const MAX_HISTORY = 50;
+
+function saveChat(query, response) {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    history.unshift({
+        id: Date.now(),
+        query: query.substring(0, 100),
+        fullQuery: query,
+        response: response,
+        timestamp: new Date().toISOString()
+    });
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
+    renderHistoryList();
+}
+
+function renderHistoryList() {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    const container = document.getElementById('history-list');
+    if (!container) return;
+    
+    if (history.length === 0) {
+        container.innerHTML = '<p class="text-center opacity-50 p-8">No chat history yet</p>';
+        return;
+    }
+    
+    container.innerHTML = history.map(chat => `
+        <div class="history-item p-3 border-b border-[hsl(var(--border))] cursor-pointer hover:bg-[hsl(var(--background))] transition-colors" 
+             onclick="loadChat(${chat.id})">
+            <p class="text-xs opacity-50">${new Date(chat.timestamp).toLocaleString()}</p>
+            <p class="text-sm truncate mt-1 opacity-80">${chat.query}${chat.query.length >= 100 ? '...' : ''}</p>
+        </div>
+    `).join('');
+}
+
+function loadChat(id) {
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    const chat = history.find(h => h.id === id);
+    if (chat) {
+        document.getElementById('query').value = chat.fullQuery;
+        document.getElementById('discussion-results').innerHTML = chat.response;
+        document.getElementById('discussion-tab').click();
+        if (window.UIkit) {
+            UIkit.update(document.getElementById('discussion-results'));
+        }
+    }
+}
+
+function clearHistory() {
+    if (confirm('Clear all chat history?')) {
+        localStorage.removeItem(HISTORY_KEY);
+        renderHistoryList();
+    }
+}
+
+document.addEventListener('DOMContentLoaded', renderHistoryList);
+
 // Client-side RAG orchestration - parallel map, then reduce
 async function executeRAG(event) {
     event.preventDefault();
@@ -126,6 +184,9 @@ async function executeRAG(event) {
         if (window.UIkit) {
             UIkit.update(resultsDiv);
         }
+        
+        // Save to chat history
+        saveChat(query, finalResult);
         
     } catch (error) {
         progressDiv.style.display = 'none';

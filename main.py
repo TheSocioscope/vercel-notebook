@@ -46,7 +46,6 @@ function updateSourcesList() {
 
 // Chat history management
 const HISTORY_KEY = 'socioscope_chat_history';
-const MAX_HISTORY = 50;
 
 function saveChat(query, response) {
     const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
@@ -57,7 +56,13 @@ function saveChat(query, response) {
         response: response,
         timestamp: new Date().toISOString()
     });
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, MAX_HISTORY)));
+    try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history));
+    } catch (e) {
+        // localStorage full - remove oldest entries and retry
+        console.warn('localStorage full, removing old entries');
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, Math.floor(history.length / 2))));
+    }
     renderHistoryList();
 }
 
